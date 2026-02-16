@@ -45,3 +45,14 @@ docker compose up -d --build
 docker compose down
 ```
 
+## 📡 MCP 接入
+
+SSE 地址：`http://你的IP:8000/sse`
+
+可在 Claude Desktop、Cherry Studio 等支持 MCP 的客户端中添加此地址。
+
+## 📄 License
+
+MIT
+```
+
