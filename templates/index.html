@@ -121,7 +121,9 @@
         async function loadList() {
             try {
                 const res = await fetch('/api/list?limit=50');
+
                 const data = await res.json();
+                window._listItems = data.results || [];
                 const div = document.getElementById('listResults');
                 if (!data.results.length) {
                     div.innerHTML = '<p style="color:#666">暂无知识</p>';
@@ -134,7 +136,8 @@
                     h += '<p style="margin:0 0 5px;font-size:14px">' + p + '</p>';
                     h += '<div style="display:flex;justify-content:space-between;align-items:center">';
                     h += '<small style="color:#999">' + item.category + ' | ' + item.time + '</small>';
-                    h += '<button data-id="' + item.id + '" onclick="deleteAndRefresh(this.dataset.id)" style="background:#ff6b6b;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px">🗑️</button>';
+                    h += '<button onclick="openEditModal(\'' + item.id + '\')" style="background:#A0D8EF;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;margin-right:6px;">✏️</button>';
+                h += '<button data-id="' + item.id + '" onclick="deleteAndRefresh(this.dataset.id)" style="background:#ff6b6b;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px">🗑️</button>';
                     h += '</div></div>';
                 });
                 div.innerHTML = h;
@@ -149,5 +152,69 @@
         }
 
     </script>
+
+<!-- 编辑弹窗 -->
+<div id="editModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;">
+  <div style="background:white; border-radius:16px; padding:24px; width:90%; max-width:500px; max-height:80vh; overflow-y:auto; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);">
+    <h3 style="margin:0 0 16px 0; color:#333;">✏️ 编辑知识</h3>
+    <input type="hidden" id="editId">
+    <div style="margin-bottom:12px;">
+      <label style="display:block; font-size:14px; color:#666; margin-bottom:4px;">内容</label>
+      <textarea id="editContent" rows="6" style="width:100%; padding:10px; border:2px solid #e0e0e0; border-radius:10px; font-size:14px; resize:vertical; box-sizing:border-box;"></textarea>
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="display:block; font-size:14px; color:#666; margin-bottom:4px;">分类</label>
+      <input type="text" id="editCategory" style="width:100%; padding:10px; border:2px solid #e0e0e0; border-radius:10px; font-size:14px; box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:16px;">
+      <label style="display:block; font-size:14px; color:#666; margin-bottom:4px;">标签（逗号分隔）</label>
+      <input type="text" id="editTags" style="width:100%; padding:10px; border:2px solid #e0e0e0; border-radius:10px; font-size:14px; box-sizing:border-box;">
+    </div>
+    <div style="display:flex; gap:10px;">
+      <button onclick="closeEditModal()" style="flex:1; padding:12px; border:2px solid #e0e0e0; background:white; border-radius:10px; font-size:15px; cursor:pointer;">取消</button>
+      <button onclick="saveEdit()" style="flex:1; padding:12px; border:none; background:#A0D8EF; color:white; border-radius:10px; font-size:15px; font-weight:bold; cursor:pointer;">💾 保存</button>
+    </div>
+  </div>
+</div>
+<script>
+function openEditModal(id) {
+    const items = window._listItems || [];
+    const item = items.find(i => i.id === id);
+    if (!item) { alert('找不到该条目'); return; }
+    document.getElementById('editId').value = id;
+    document.getElementById('editContent').value = item.content || '';
+    document.getElementById('editCategory').value = item.category || '通用';
+    document.getElementById('editTags').value = (item.tags || []).filter(t => t).join(',');
+    document.getElementById('editModal').style.display = 'block';
+}
+function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+}
+async function saveEdit() {
+    const id = document.getElementById('editId').value;
+    const content = document.getElementById('editContent').value.trim();
+    const category = document.getElementById('editCategory').value.trim() || '通用';
+    const tags = document.getElementById('editTags').value.split(',').map(t => t.trim()).filter(t => t);
+    if (!content) { alert('内容不能为空'); return; }
+    try {
+        const res = await fetch('/api/update/' + id, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({content, category, tags})
+        });
+        if (res.ok) {
+            closeEditModal();
+            loadList();
+        } else {
+            const data = await res.json();
+            alert('更新失败: ' + (data.detail || '未知错误'));
+        }
+    } catch(e) { alert('请求失败: ' + e.message); }
+}
+document.getElementById('editModal').addEventListener('click', function(e) {
+    if (e.target === this) closeEditModal();
+});
+</script>
+
 </body>
 </html>
