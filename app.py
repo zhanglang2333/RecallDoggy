@@ -12,7 +12,8 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 from typing import List
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+import cnlunar
 import hashlib
 
 app = FastAPI()
@@ -173,6 +174,52 @@ async def update_knowledge(doc_id: str, req: UpdateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ===================== MCP =====================
+
+@app.get("/api/today")
+async def api_today():
+    """前端用：获取今日日期信息"""
+    tz_cn = timezone(timedelta(hours=8))
+    now = datetime.now(tz_cn).replace(tzinfo=None)
+    a = cnlunar.Lunar(now, godType='8char')
+    
+    lunar_date = f"{a.lunarMonthCn}{a.lunarDayCn}"
+    ganzhi_year = a.year8Char
+    zodiac = a.chineseYearZodiac
+    weekdays = ["星期一","星期二","星期三","星期四","星期五","星期六","星期日"]
+    weekday = weekdays[now.weekday()]
+    
+    solar_term = a.todaySolarTerms
+    if solar_term == "无":
+        solar_term = None
+    
+    festivals = []
+    solar_festivals = {
+        "01-01":"元旦","02-14":"情人节","03-08":"妇女节",
+        "04-01":"愚人节","05-01":"劳动节","05-04":"青年节",
+        "06-01":"儿童节","09-10":"教师节","10-01":"国庆节",
+        "12-24":"平安夜","12-25":"圣诞节"
+    }
+    solar_key = now.strftime("%m-%d")
+    if solar_key in solar_festivals:
+        festivals.append(solar_festivals[solar_key])
+    
+    lunar_festivals = a.get_legalHolidays() + a.get_otherHolidays()
+    festivals.extend([f for f in lunar_festivals if f])
+    
+    tomorrow = now + timedelta(days=1)
+    a_tomorrow = cnlunar.Lunar(tomorrow, godType='8char')
+    if a_tomorrow.lunarMonthCn == "正月" and a_tomorrow.lunarDayCn == "初一":
+        if "除夕" not in festivals:
+            festivals.append("除夕")
+    
+    return {
+        "solar": now.strftime("%Y年%m月%d日"),
+        "weekday": weekday,
+        "lunar": f"{ganzhi_year}年（{zodiac}年）{lunar_date}",
+        "solar_term": solar_term,
+        "festivals": list(set(festivals))
+    }
+
 mcp_server = FastMCP(
     "RecallDoggy",
     transport_security=TransportSecuritySettings(
@@ -222,6 +269,76 @@ async def mcp_delete(doc_id: str) -> str:
     """从知识库删除指定ID的知识"""
     collection.delete(expr=f'id == "{doc_id}"')
     return f"已删除 {doc_id}"
+
+
+@mcp_server.tool()
+async def mcp_today() -> str:
+    """获取今天的完整日期信息，包括公历、农历、节气、节日、纪念日。AI应在需要感知当前日期时主动调用此工具。"""
+    tz_cn = timezone(timedelta(hours=8))
+    now = datetime.now(tz_cn).replace(tzinfo=None)
+    a = cnlunar.Lunar(now, godType='8char')
+    
+    lunar_date = f"{a.lunarMonthCn}{a.lunarDayCn}"
+    ganzhi_year = a.year8Char
+    zodiac = a.chineseYearZodiac
+    weekdays = ["星期一","星期二","星期三","星期四","星期五","星期六","星期日"]
+    weekday = weekdays[now.weekday()]
+    
+    solar_term = a.todaySolarTerms
+    if solar_term == "无":
+        solar_term = None
+    
+    festivals = []
+    solar_festivals = {
+        "01-01":"元旦","02-14":"情人节","03-08":"妇女节",
+        "04-01":"愚人节","05-01":"劳动节","05-04":"青年节",
+        "06-01":"儿童节","09-10":"教师节","10-01":"国庆节",
+        "12-24":"平安夜","12-25":"圣诞节"
+    }
+    solar_key = now.strftime("%m-%d")
+    if solar_key in solar_festivals:
+        festivals.append(solar_festivals[solar_key])
+    
+    lunar_festivals = a.get_legalHolidays() + a.get_otherHolidays()
+    festivals.extend([f for f in lunar_festivals if f])
+    
+    tomorrow = now + timedelta(days=1)
+    a_tomorrow = cnlunar.Lunar(tomorrow, godType='8char')
+    if a_tomorrow.lunarMonthCn == "正月" and a_tomorrow.lunarDayCn == "初一":
+        if "除夕" not in festivals:
+            festivals.append("除夕")
+    
+    custom = []
+    try:
+        from pymilvus import MilvusClient
+        client = MilvusClient(uri=ZILLIZ_URI, token=ZILLIZ_TOKEN)
+        res = client.query(
+            collection_name="knowledge_base",
+            filter='category == "纪念日"',
+            output_fields=["content", "tags"],
+            limit=100
+        )
+        for item in res:
+            tags = item.get("tags", [])
+            for tag in tags:
+                tag = tag.strip()
+                if tag == solar_key:
+                    custom.append(item["content"])
+                if tag in lunar_date:
+                    custom.append(item["content"])
+    except Exception:
+        pass
+    
+    lines_out = [f"📅 {now.strftime('%Y年%m月%d日')} {weekday}"]
+    lines_out.append(f"🏮 农历：{ganzhi_year}年（{zodiac}年）{lunar_date}")
+    if solar_term:
+        lines_out.append(f"🌿 节气：{solar_term}")
+    if festivals:
+        lines_out.append(f"🎉 节日：{' / '.join(set(festivals))}")
+    if custom:
+        lines_out.append(f"💝 纪念日：{' / '.join(custom)}")
+    
+    return "\n".join(lines_out)
 
 @mcp_server.tool()
 async def mcp_stats() -> str:

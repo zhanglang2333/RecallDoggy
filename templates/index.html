@@ -32,7 +32,28 @@
         .message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } .header h1 { font-size: 1.8em; } }
-    </style>
+    
+    .today-banner {
+      text-align: center;
+      padding: 10px 20px;
+      margin: -10px auto 20px auto;
+      max-width: 700px;
+      font-size: 14px;
+      color: #555;
+      background: linear-gradient(135deg, #f0f9ff, #e8f4fd);
+      border-radius: 12px;
+      border: 1px solid #A0D8EF;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .today-banner .item { white-space: nowrap; }
+    .today-banner .divider { color: #A0D8EF; }
+    .today-banner .festival { color: #e74c3c; font-weight: 500; }
+
+  </style>
 </head>
 <body>
     <div class="container">
@@ -41,7 +62,12 @@
             <div class="stats">📚 总知识数：<strong id="totalCount">{{ total }}</strong></div>
         </div>
         <div class="grid">
-            <div class="card">
+            
+    <div class="today-banner" id="todayBanner">
+      <span class="item" id="todaySolar">📅 加载中...</span>
+    </div>
+
+    <div class="card">
                 <h2>✍️ 写入知识</h2>
                 <div id="writeMessage"></div>
                 <textarea id="writeContent" placeholder="输入知识内容..."></textarea>
@@ -73,6 +99,24 @@
         <h2>📋 知识列表</h2>
         <button onclick="loadList()">📋 加载全部</button>
         <div id="listResults" style="margin-top:15px;"></div>
+    </div>
+
+    
+    <div class="card">
+      <h2>💝 纪念日管理</h2>
+      <div style="margin-bottom:12px;">
+        <input type="text" id="annivName" placeholder="纪念日名称，如：妈妈生日" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;margin-bottom:8px;">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+          <select id="annivType" style="padding:8px;border:1px solid #ddd;border-radius:8px;">
+            <option value="solar">公历</option>
+            <option value="lunar">农历</option>
+          </select>
+          <input type="text" id="annivDate" placeholder="日期，如 02-14 或 正月初一" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:8px;">
+        </div>
+        <button onclick="addAnniversary()" style="width:100%;padding:10px;background:#A0D8EF;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:15px;">添加纪念日</button>
+      </div>
+      <div id="annivList" style="margin-top:12px;"></div>
+      <button onclick="loadAnniversaries()" style="width:100%;padding:8px;background:#f0f9ff;color:#555;border:1px solid #A0D8EF;border-radius:8px;cursor:pointer;margin-top:8px;">刷新纪念日列表</button>
     </div>
 
     <script>
@@ -151,7 +195,109 @@
             loadList();
         }
 
-    </script>
+    
+    // 加载今日信息
+    async function loadToday() {
+      try {
+        const res = await fetch('/api/today');
+        const data = await res.json();
+        let parts = [
+          '📅 ' + data.solar + ' ' + data.weekday,
+          '🏮 ' + data.lunar
+        ];
+        if (data.solar_term) parts.push('🌿 ' + data.solar_term);
+        if (data.festivals && data.festivals.length > 0) {
+          parts.push('<span class="festival">🎉 ' + data.festivals.join(' / ') + '</span>');
+        }
+        document.getElementById('todayBanner').innerHTML = 
+          parts.map(p => '<span class="item">' + p + '</span>').join('<span class="divider">|</span>');
+      } catch(e) {
+        document.getElementById('todayBanner').innerHTML = '<span class="item">📅 日期加载失败</span>';
+      }
+    }
+    loadToday();
+
+  
+    // 纪念日管理
+    async function addAnniversary() {
+      const name = document.getElementById('annivName').value.trim();
+      const type = document.getElementById('annivType').value;
+      const date = document.getElementById('annivDate').value.trim();
+      
+      if (!name || !date) {
+        alert('请填写纪念日名称和日期');
+        return;
+      }
+      
+      try {
+        const res = await fetch('/api/write', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            content: name,
+            category: '纪念日',
+            tags: [date, type]
+          })
+        });
+        const data = await res.json();
+        if (data.id) {
+          alert('✅ 纪念日已添加！');
+          document.getElementById('annivName').value = '';
+          document.getElementById('annivDate').value = '';
+          loadAnniversaries();
+          loadToday();
+        } else {
+          alert('❌ 添加失败');
+        }
+      } catch(e) {
+        alert('❌ 网络错误');
+      }
+    }
+    
+    async function loadAnniversaries() {
+      try {
+        const res = await fetch('/api/list');
+        const data = await res.json();
+        const items = data.results || data.items || data;
+        const annivs = items.filter(item => item.category === '纪念日');
+        const container = document.getElementById('annivList');
+        if (annivs.length === 0) {
+          container.innerHTML = '<p style="color:#999;text-align:center;">暂无纪念日</p>';
+          return;
+        }
+        let h = '';
+        for (const item of annivs) {
+          const tags = (item.tags || []).join(' ');
+          const id = item.id || item.pk;
+          h += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;margin:4px 0;background:#f9f9f9;border-radius:8px;">
+            <span>💝 \({item.content} <small style="color:#999;">(\){tags})</small></span>
+            <button onclick="deleteAnniversary('${id}',this)" style="background:#ff6b6b;color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;">删除</button>
+          </div>`;
+        }
+        container.innerHTML = h;
+      } catch(e) {
+        console.error('loadAnniversaries error:', e);
+        document.getElementById('annivList').innerHTML = '<p style="color:#e74c3c;">加载失败</p>';
+      }
+    }
+    
+    async function deleteAnniversary(id, btn) {
+      if (!confirm('确定删除这个纪念日？')) return;
+      try {
+        const res = await fetch('/api/delete/' + id, {method:'DELETE'});
+        const data = await res.json();
+        if (data.message) {
+          btn.parentElement.remove();
+          loadToday();
+        }
+      } catch(e) {
+        alert('删除失败');
+      }
+    }
+    
+    loadAnniversaries();
+
+  </script>
 
 <!-- 编辑弹窗 -->
 <div id="editModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;">
@@ -214,7 +360,105 @@ async function saveEdit() {
 document.getElementById('editModal').addEventListener('click', function(e) {
     if (e.target === this) closeEditModal();
 });
-</script>
+
+    // 加载今日信息
+    async function loadToday() {
+      try {
+        const res = await fetch('/api/today');
+        const data = await res.json();
+        let parts = [
+          '📅 ' + data.solar + ' ' + data.weekday,
+          '🏮 ' + data.lunar
+        ];
+        if (data.solar_term) parts.push('🌿 ' + data.solar_term);
+        if (data.festivals && data.festivals.length > 0) {
+          parts.push('<span class="festival">🎉 ' + data.festivals.join(' / ') + '</span>');
+        }
+        document.getElementById('todayBanner').innerHTML = 
+          parts.map(p => '<span class="item">' + p + '</span>').join('<span class="divider">|</span>');
+      } catch(e) {
+        document.getElementById('todayBanner').innerHTML = '<span class="item">📅 日期加载失败</span>';
+      }
+    }
+    loadToday();
+
+  
+    // 纪念日管理
+    async function addAnniversary() {
+      const name = document.getElementById('annivName').value.trim();
+      const type = document.getElementById('annivType').value;
+      const date = document.getElementById('annivDate').value.trim();
+      
+      if (!name || !date) {
+        alert('请填写纪念日名称和日期');
+        return;
+      }
+      
+      try {
+        const res = await fetch('/api/write', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            content: name,
+            category: '纪念日',
+            tags: [date, type]
+          })
+        });
+        const data = await res.json();
+        if (data.id) {
+          alert('✅ 纪念日已添加！');
+          document.getElementById('annivName').value = '';
+          document.getElementById('annivDate').value = '';
+          loadAnniversaries();
+          loadToday();
+        } else {
+          alert('❌ 添加失败');
+        }
+      } catch(e) {
+        alert('❌ 网络错误');
+      }
+    }
+    
+    async function loadAnniversaries() {
+      try {
+        const res = await fetch('/api/list');
+        const data = await res.json();
+        const annivs = (data.results || data.items || data).filter(item => item.category === '纪念日');
+        const container = document.getElementById('annivList');
+        if (annivs.length === 0) {
+          container.innerHTML = '<p style="color:#999;text-align:center;">暂无纪念日</p>';
+          return;
+        }
+        container.innerHTML = annivs.map(item => {
+          const tags = (item.tags || []).join(' ');
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;margin:4px 0;background:#f9f9f9;border-radius:8px;">' +
+            '<span>💝 ' + item.content + ' <small style="color:#999;">(' + tags + ')</small></span>' +
+            '<button onclick="deleteAnniversary(\''+item.id+'\',this)" style="background:#ff6b6b;color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;">删除</button>' +
+          '</div>';
+        }).join('');
+      } catch(e) {
+        document.getElementById('annivList').innerHTML = '<p style="color:#e74c3c;">加载失败</p>';
+      }
+    }
+    
+    async function deleteAnniversary(id, btn) {
+      if (!confirm('确定删除这个纪念日？')) return;
+      try {
+        const res = await fetch('/api/delete/' + id, {method:'DELETE'});
+        const data = await res.json();
+        if (data.message) {
+          btn.parentElement.remove();
+          loadToday();
+        }
+      } catch(e) {
+        alert('删除失败');
+      }
+    }
+    
+    // 页面加载时也加载纪念日列表
+    loadAnniversaries();
+
+  </script>
 
 </body>
 </html>
