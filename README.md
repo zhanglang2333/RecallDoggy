@@ -1,58 +1,12 @@
 # 🐕 RecallDoggy
 
-基于向量数据库的 AI 知识库系统，支持语义搜索、MCP 接入。
+一个基于 Zilliz Cloud 向量数据库的 MCP 知识库服务，支持 SSE 和 stdio 双传输模式。
 
-## ✨ 功能
+## ✨ 功能特性
 
-- 📝 写入知识（支持分类、标签）
-- 🔍 语义搜索（基于向量相似度，支持调整 top_k）
-- 📋 知识列表（浏览、删除）
-- 🤖 MCP SSE 接入（可连接 Claude 等 AI 客户端）
-
-## 🛠️ 技术栈
-
-- FastAPI
-- Zilliz Cloud（Milvus 托管版）
-- SentenceTransformer（paraphrase-multilingual-MiniLM-L12-v2）
-
-## 🚀 Docker 一键部署
-
-### 1.‌ 克隆仓库
-
-```bash
-git clone https://github.com/zhanglang2333/RecallDoggy.git
-cd RecallDoggy
-
-### 2.注册 Zilliz Cloud （免费的就行）
-
-前往 [Zilliz Cloud](https://cloud.zilliz.com/) 注册账号，创建一个 Serverless 集群，获取连接地址和 Token。
-
-### 3.配置环境变量
-
-cp .env.example .env
-编辑 `.env`，填入你的 Zilliz 连接信息
-ZILLIZ_URI=https://你的地址.cloud.zilliz.com
-ZILLIZ_TOKEN=你的token
-
-### 4.启动
-docker compose up -d --build
-
-首次启动会下载模型，大约需要 3~5 分钟。
-启动成功后访问：http://localhost:8000
-
-### 5.停止
-
-docker compose down
-```
-
-## 📡 MCP 接入
-
-SSE 地址：`http://你的IP:8000/sse`
-
-可在 Claude Desktop、Cherry Studio 等支持 MCP 的客户端中添加此地址。
-
-有问题提交issue
-
-## 📄 License
-
-MIT
+- 📝 **记忆管理** - 写入 / 语义搜索 / 列表 / 编辑 / 删除
+- 🎉 **纪念日管理** - 添加 / 查询 / 删除纪念日
+- 📅 **时间感知** - mcp_today 工具，支持农历、节气、节日、纪念日查询
+- 🌐 **双传输模式** - SSE（远程部署）+ stdio（本地直连）
+- 🐳 **Docker 支持** - 一键容器化部署
+- 🖥️ **前端页面** - 可视化管理知识库
