@@ -130,3 +130,7 @@ docker run -d -p 8000:8000 --env-file .env recalldoggy
 |---|---|
 | Python | 3.10+ |
 | 操作系统 | Windows / macOS / Linux |
+
+## 📄 License
+
+MIT
