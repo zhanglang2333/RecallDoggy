@@ -12,7 +12,7 @@ description: >
 
 ## MCP 连接方式
 
-- SSE: `http://154.12.29.62:8000/mcp/sse`
+- SSE: "fix: remove server IP from SKILL.md"
 - stdio: `python app.py --stdio`
 
 ## 工具列表
