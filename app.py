@@ -15,6 +15,7 @@ from typing import List
 from datetime import datetime, timedelta, timezone
 import cnlunar
 import hashlib
+import httpx
 
 app = FastAPI()
 
@@ -32,6 +33,7 @@ ZILLIZ_URI = os.getenv("ZILLIZ_URI")
 ZILLIZ_TOKEN = os.getenv("ZILLIZ_TOKEN")
 COLLECTION_NAME = "ai_knowledge"
 EMBEDDING_DIM = 384
+QWEATHER_KEY = os.getenv("QWEATHER_KEY", "")
 
 encoder = None
 collection = None
@@ -129,6 +131,18 @@ async def search_knowledge(req: SearchRequest):
 async def stats_api():
     return {"total": collection.num_entities, "collection": COLLECTION_NAME}
 
+#@mcp_server.tool()
+#async def mcp_weather(city: str = "北京") -> str:
+#    """查询指定城市的实时天气和未来3天预报"""
+#    data = await fetch_weather(city)
+#    if "error" in data:
+#        return data["error"]
+#    lines = [f"🌡️ {data['city']}：{data['text']}，{data['temp']}°C（体感{data['feelsLike']}°C），湿度{data['humidity']}%，{data['windDir']}{data['windScale']}级"]
+#    if data.get("forecast"):
+#        for d in data["forecast"]:
+#            lines.append(f"  {d['date']}：{d['textDay']}→{d['textNight']}，{d['tempMin']}~{d['tempMax']}°C")
+#    return "\n".join(lines)
+
 @app.delete("/api/delete/{doc_id}")
 async def delete_knowledge(doc_id: str):
     try:
@@ -203,7 +217,7 @@ async def api_today():
     if solar_key in solar_festivals:
         festivals.append(solar_festivals[solar_key])
     
-    lunar_festivals = a.get_legalHolidays() + a.get_otherHolidays()
+    lunar_festivals = [a.get_legalHolidays(), a.get_otherHolidays()]
     festivals.extend([f for f in lunar_festivals if f])
     
     tomorrow = now + timedelta(days=1)
@@ -219,6 +233,39 @@ async def api_today():
         "solar_term": solar_term,
         "festivals": list(set(festivals))
     }
+async def fetch_weather(city:str) ->dict:
+    if not QWEATHER_KEY:
+        return{"error":"未配置天气API密钥"}
+    try:
+        async with httpx.AsyncClient() as client:
+            geo_url = f"https://geoapi.qweather.com/v2/city/lookup?location={city}&key={QWEATHER_KEY}"
+            geo_res = await client.get(geo_url)
+            geo_data = geo_res.json()
+            if geo_data.get("code") != "200" or not geo_data.get("location"):
+                return {"error": f"找不到城市: {city}"}
+            loc = geo_data["location"][0]
+            city_id = loc["id"]
+            city_name = loc["name"]
+            now_url = f"https://devapi.qweather.com/v7/weather/now?location={city_id}&key={QWEATHER_KEY}"
+            now_res = await client.get(now_url)
+            now_data = now_res.json()
+            if now_data.get("code") != "200":
+                return {"error": "获取天气失败"}
+            n = now_data["now"]
+            forecast_url = f"https://devapi.qweather.com/v7/weather/3d?location={city_id}&key={QWEATHER_KEY}"
+            forecast_res = await client.get(forecast_url)
+            forecast_data = forecast_res.json()
+            forecast = []
+            if forecast_data.get("code") == "200":
+                for d in forecast_data["daily"]:
+                    forecast.append({"date": d["fxDate"], "textDay": d["textDay"], "textNight": d["textNight"], "tempMin": d["tempMin"], "tempMax": d["tempMax"]})
+            return {"city": city_name, "temp": n["temp"], "feelsLike": n["feelsLike"], "text": n["text"], "humidity": n["humidity"], "windDir": n["windDir"], "windScale": n["windScale"], "forecast": forecast}
+    except Exception as e:
+        return {"error": str(e)} 
+
+@app.get("/api/weather")
+async def api_weather(city: str = "北京"):
+    return await fetch_weather(city)
 
 mcp_server = FastMCP(
     "RecallDoggy",
@@ -299,7 +346,7 @@ async def mcp_today() -> str:
     if solar_key in solar_festivals:
         festivals.append(solar_festivals[solar_key])
     
-    lunar_festivals = a.get_legalHolidays() + a.get_otherHolidays()
+    lunar_festivals = [a.get_legalHolidays(), a.get_otherHolidays()]
     festivals.extend([f for f in lunar_festivals if f])
     
     tomorrow = now + timedelta(days=1)
@@ -346,6 +393,18 @@ async def mcp_stats() -> str:
     return json.dumps({"total": collection.num_entities, "collection": COLLECTION_NAME})
 
 app.mount("/mcp", mcp_server.sse_app())
+
+@mcp_server.tool()
+async def mcp_weather(city: str = "天津") -> str:
+    """查询指定城市的实时天气"""
+    data = await fetch_weather(city)
+    if "error" in data:
+        return data["error"]
+    lines = [f"🌡️ {data['city']}: {data['temp']}°C {data['text']}"]
+    if data.get("forecast"):
+        for d in data["forecast"]:
+            lines.append(f"  {d['date']}: {d['textDay']} {d['tempMin']}~{d['tempMax']}°C")
+    return "\n".join(lines)
 
 if __name__ == "__main__":
     import sys

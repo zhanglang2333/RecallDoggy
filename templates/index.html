@@ -67,6 +67,17 @@
       <span class="item" id="todaySolar">📅 加载中...</span>
     </div>
 
+    <div class="today-banner" id="weatherBanner" style="margin-top:10px;">
+      <span class="item" id="weatherInfo">🌡️ 加载天气中...</span>
+      <span class="divider">|</span>
+      <span class="item" id="weatherForecast"></span>
+      <span class="divider">|</span>
+      <span class="item" style="display:flex;align-items:center;gap:4px;">
+	<input type="text" id="cityInput" placeholder="城市" style="width:56px;padding:2px 6px;border:1px solid #A0D8EF;border-radius:6px;font-size:12px;text-align:center;" onkeypress="if(event.key==='Enter') saveCity()">
+	<button onclick="saveCity()" style="padding:2px 8px;font-size:12px;border:none;background:#A0D8EF;color:#fff;border-radius:6px;cursor:pointer;">设置</button>
+      </span>
+    </div>
+
     <div class="card">
                 <h2>✍️ 写入知识</h2>
                 <div id="writeMessage"></div>
@@ -217,7 +228,25 @@
     }
     loadToday();
 
-  
+   
+    function saveCity() {
+      var city = document.getElementById('cityInput').value;
+    if (city) { localStorage.setItem('weatherCity', city); loadWeather(); }
+    }
+    function loadWeather() {
+      var city = localStorage.getItem('weatherCity') || '北京';
+      document.getElementById('cityInput').value = city;
+      fetch('https://wttr.in/' + city + '?format=3&lang=zh')
+        .then(function(r){ return r.text(); })
+	.then(function(d){ document.getElementById('weatherInfo').innerText = d; })
+	.catch(function(){ document.getElementById('weatherInfo').innerText = '获取失败'; });
+      fetch('https://wttr.in/' + city + '?format=%t+%C&lang=zh')
+        .then(function(r){ return r.text(); })
+        .then(function(d){ document.getElementById('weatherForecast').innerText = d; });
+    }
+    loadWeather();
+
+
     // 纪念日管理
     async function addAnniversary() {
       const name = document.getElementById('annivName').value.trim();
