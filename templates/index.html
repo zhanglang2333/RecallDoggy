@@ -16,11 +16,13 @@
         textarea, input[type="text"] { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; font-family: inherit; margin-bottom: 15px; transition: border 0.3s; }
         textarea:focus, input:focus { outline: none; border-color: #A0D8EF; }
         textarea { min-height: 120px; resize: vertical; }
+        select { padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; margin-bottom: 15px; }
         button { background: linear-gradient(135deg, #A0D8EF 0%, #7CC2DE 100%); color: white; border: none; padding: 12px 30px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
         button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102,126,234,0.4); }
         button:active { transform: translateY(0); }
         .result-item { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #A0D8EF; position: relative; }
         .result-item:hover { background: #e9ecef; }
+        .result-item.perm-item { border-left: 4px solid #FFD700; background: #fffef5; }
         .similarity { position: absolute; top: 15px; right: 15px; background: #A0D8EF; color: white; padding: 5px 12px; border-radius: 15px; font-size: 12px; font-weight: 600; }
         .category { display: inline-block; background: #7CC2DE; color: white; padding: 3px 10px; border-radius: 12px; font-size: 12px; margin-right: 5px; }
         .tag { display: inline-block; background: #e0e0e0; padding: 3px 10px; border-radius: 12px; font-size: 12px; margin-right: 5px; margin-top: 5px; }
@@ -32,151 +34,252 @@
         .message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } .header h1 { font-size: 1.8em; } }
-    
-    .today-banner {
-      text-align: center;
-      padding: 10px 20px;
-      margin: -10px auto 20px auto;
-      max-width: 700px;
-      font-size: 14px;
-      color: #555;
-      background: linear-gradient(135deg, #f0f9ff, #e8f4fd);
-      border-radius: 12px;
-      border: 1px solid #A0D8EF;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-    .today-banner .item { white-space: nowrap; }
-    .today-banner .divider { color: #A0D8EF; }
-    .today-banner .festival { color: #e74c3c; font-weight: 500; }
-
-  </style>
+        .level-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; margin-right: 5px; }
+        .level-flash { background: #ff6b6b; color: white; }
+        .level-short { background: #ffa502; color: white; }
+        .level-long { background: #2ed573; color: white; }
+        .level-permanent { background: #FFD700; color: #333; }
+        .meta-info { font-size: 12px; color: #888; margin-top: 6px; }
+        .today-banner { text-align: center; padding: 10px 20px; margin: -10px auto 20px auto; max-width: 700px; font-size: 14px; color: #555; background: linear-gradient(135deg, #f0f9ff, #e8f4fd); border-radius: 12px; border: 1px solid #A0D8EF; display: flex; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .today-banner .item { white-space: nowrap; }
+        .today-banner .divider { color: #A0D8EF; }
+        .today-banner .festival { color: #e74c3c; font-weight: 500; }
+        .pin-btn { background: #FFD700; color: #333; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 6px; }
+        .pin-btn:hover { background: #FFC107; transform: none; box-shadow: none; }
+        .cleanup-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+        .cleanup-row label { font-size: 14px; color: #666; }
+        .cleanup-row input[type="number"] { width: 80px; padding: 6px; border: 1px solid #ddd; border-radius: 6px; }
+    </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>🧠 AI RAG 知识库</h1>
-            <div class="stats">📚 总知识数：<strong id="totalCount">{{ total }}</strong></div>
+            <div class="stats">📚 总知识数：<strong id="totalCount">{{ total }}</strong> | <span id="levelStats"></span></div>
         </div>
         <div class="grid">
-            
-    <div class="today-banner" id="todayBanner">
-      <span class="item" id="todaySolar">📅 加载中...</span>
-    </div>
-
-    <div class="today-banner" id="weatherBanner" style="margin-top:10px;">
-      <span class="item" id="weatherInfo">🌡️ 加载天气中...</span>
-      <span class="divider">|</span>
-      <span class="item" id="weatherForecast"></span>
-      <span class="divider">|</span>
-      <span class="item" style="display:flex;align-items:center;gap:4px;">
-	<input type="text" id="cityInput" placeholder="城市" style="width:56px;padding:2px 6px;border:1px solid #A0D8EF;border-radius:6px;font-size:12px;text-align:center;" onkeypress="if(event.key==='Enter') saveCity()">
-	<button onclick="saveCity()" style="padding:2px 8px;font-size:12px;border:none;background:#A0D8EF;color:#fff;border-radius:6px;cursor:pointer;">设置</button>
-      </span>
-    </div>
-
-    <div class="card">
+            <div class="today-banner" id="todayBanner">
+                <span class="item" id="todaySolar">📅 加载中...</span>
+            </div>
+            <div class="today-banner" id="weatherBanner" style="margin-top:10px;">
+                <span class="item" id="weatherInfo">🌡️ 加载天气中...</span>
+                <span class="divider">|</span>
+                <span class="item" id="weatherForecast"></span>
+                <span class="divider">|</span>
+                <span class="item" style="display:flex;align-items:center;gap:4px;">
+                    <input type="text" id="cityInput" placeholder="城市" style="width:56px;padding:2px 6px;border:1px solid #A0D8EF;border-radius:6px;font-size:12px;text-align:center;" onkeypress="if(event.key==='Enter') saveCity()">
+                    <button onclick="saveCity()" style="padding:2px 8px;font-size:12px;border:none;background:#A0D8EF;color:#fff;border-radius:6px;cursor:pointer;">设置</button>
+                </span>
+            </div>
+            <div class="card">
                 <h2>✍️ 写入知识</h2>
                 <div id="writeMessage"></div>
                 <textarea id="writeContent" placeholder="输入知识内容..."></textarea>
                 <input type="text" id="writeCategory" placeholder="分类（如：技术、生活）" value="通用">
                 <input type="text" id="writeTags" placeholder="标签（逗号分隔，如：Python,AI）">
+                <div style="margin-bottom:15px;">
+                    <label style="font-size:14px;color:#666;">初始记忆层级：</label>
+                    <select id="writeLevel">
+                        <option value="flash">🔴 闪现 (flash)</option>
+                        <option value="short">🟡 短期 (short)</option>
+                        <option value="long">🟢 长期 (long)</option>
+                        <option value="permanent">💎 永久 (permanent)</option>
+                    </select>
+                </div>
                 <button onclick="writeKnowledge()">💾 保存到知识库</button>
             </div>
             <div class="card">
                 <h2>🔍 搜索知识</h2>
                 <input type="text" id="searchQuery" placeholder="输入搜索关键词..." onkeypress="if(event.key==='Enter') searchKnowledge()">
-                            <div style="margin-bottom: 15px;">
-                <label style="font-size: 14px; color: #666;">
-                    返回条数：<strong id="topKValue">5</strong>
-                </label>
-                <input type="range" id="topKSlider" min="1" max="20" value="5"
-                    style="width: 100%; margin-top: 5px; accent-color: #A0D8EF;"
-                    oninput="document.getElementById('topKValue').textContent = this.value">
-            </div>
-            <button onclick="searchKnowledge()">🔎 搜索</button>
+                <div style="margin-bottom: 15px;">
+                    <label style="font-size: 14px; color: #666;">返回条数：<strong id="topKValue">5</strong></label>
+                    <input type="range" id="topKSlider" min="1" max="20" value="5" style="width: 100%; margin-top: 5px; accent-color: #A0D8EF;" oninput="document.getElementById('topKValue').textContent = this.value">
+                </div>
+                <button onclick="searchKnowledge()">🔎 搜索</button>
             </div>
         </div>
         <div class="card">
             <h2>📖 搜索结果</h2>
             <div id="searchResults"><div class="loading">输入关键词开始搜索...</div></div>
         </div>
-    </div>
-    
-    <div class="card">
-        <h2>📋 知识列表</h2>
-        <button onclick="loadList()">📋 加载全部</button>
-        <div id="listResults" style="margin-top:15px;"></div>
+        <div class="card">
+            <h2>📋 知识列表</h2>
+            <button onclick="loadList()">📋 加载全部</button>
+            <div id="listResults" style="margin-top:15px;"></div>
+        </div>
+        <div class="card">
+            <h2>💝 纪念日管理</h2>
+            <div style="margin-bottom:12px;">
+                <input type="text" id="annivName" placeholder="纪念日名称，如：妈妈生日" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;margin-bottom:8px;">
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+                    <select id="annivType" style="padding:8px;border:1px solid #ddd;border-radius:8px;">
+                        <option value="solar">公历</option>
+                        <option value="lunar">农历</option>
+                    </select>
+                    <input type="text" id="annivDate" placeholder="日期，如 02-14 或 正月初一" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:8px;">
+                </div>
+                <button onclick="addAnniversary()" style="width:100%;padding:10px;background:#A0D8EF;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:15px;">添加纪念日</button>
+            </div>
+            <div id="annivList" style="margin-top:12px;"></div>
+            <button onclick="loadAnniversaries()" style="width:100%;padding:8px;background:#f0f9ff;color:#555;border:1px solid #A0D8EF;border-radius:8px;cursor:pointer;margin-top:8px;">刷新纪念日列表</button>
+        </div>
+        <div class="card">
+            <h2>🧹 记忆清理</h2>
+            <p style="font-size:13px;color:#888;margin-bottom:12px;">清理衰减率低于阈值的 flash/short/long 记忆。permanent 永不清理。</p>
+            <div class="cleanup-row">
+                <label>衰减阈值（0~1）：</label>
+                <input type="number" id="cleanupThreshold" value="0.05" min="0" max="1" step="0.01">
+                <button onclick="doCleanup()" style="background:#dc3545;padding:8px 20px;font-size:14px;">🗑️ 执行清理</button>
+            </div>
+            <div id="cleanupResult" style="margin-top:10px;"></div>
+        </div>
     </div>
 
-    
-    <div class="card">
-      <h2>💝 纪念日管理</h2>
-      <div style="margin-bottom:12px;">
-        <input type="text" id="annivName" placeholder="纪念日名称，如：妈妈生日" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;margin-bottom:8px;">
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-          <select id="annivType" style="padding:8px;border:1px solid #ddd;border-radius:8px;">
-            <option value="solar">公历</option>
-            <option value="lunar">农历</option>
-          </select>
-          <input type="text" id="annivDate" placeholder="日期，如 02-14 或 正月初一" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:8px;">
+    <!-- 编辑弹窗 -->
+    <div id="editModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;">
+        <div style="background:white; border-radius:16px; padding:24px; width:90%; max-width:500px; max-height:80vh; overflow-y:auto; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);">
+            <h3 style="margin:0 0 16px 0; color:#333;">✏️ 编辑知识</h3>
+            <input type="hidden" id="editId">
+            <div style="margin-bottom:12px;">
+                <label style="display:block; font-size:14px; color:#666; margin-bottom:4px;">内容</label>
+                <textarea id="editContent" rows="6" style="width:100%; padding:10px; border:2px solid #e0e0e0; border-radius:10px; font-size:14px; resize:vertical; box-sizing:border-box;"></textarea>
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="display:block; font-size:14px; color:#666; margin-bottom:4px;">分类</label>
+                <input type="text" id="editCategory" style="width:100%; padding:10px; border:2px solid #e0e0e0; border-radius:10px; font-size:14px; box-sizing:border-box;">
+            </div>
+            <div style="margin-bottom:16px;">
+                <label style="display:block; font-size:14px; color:#666; margin-bottom:4px;">标签（逗号分隔）</label>
+                <input type="text" id="editTags" style="width:100%; padding:10px; border:2px solid #e0e0e0; border-radius:10px; font-size:14px; box-sizing:border-box;">
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button onclick="closeEditModal()" style="flex:1; padding:12px; border:2px solid #e0e0e0; background:white; border-radius:10px; font-size:15px; cursor:pointer; color:#333;">取消</button>
+                <button onclick="saveEdit()" style="flex:1; padding:12px; border:none; background:#A0D8EF; color:white; border-radius:10px; font-size:15px; font-weight:bold; cursor:pointer;">💾 保存</button>
+            </div>
         </div>
-        <button onclick="addAnniversary()" style="width:100%;padding:10px;background:#A0D8EF;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:15px;">添加纪念日</button>
-      </div>
-      <div id="annivList" style="margin-top:12px;"></div>
-      <button onclick="loadAnniversaries()" style="width:100%;padding:8px;background:#f0f9ff;color:#555;border:1px solid #A0D8EF;border-radius:8px;cursor:pointer;margin-top:8px;">刷新纪念日列表</button>
     </div>
 
     <script>
         const API_BASE = '';
+        const LEVEL_BADGES = {
+            'flash': '<span class="level-badge level-flash">🔴 flash</span>',
+            'short': '<span class="level-badge level-short">🟡 short</span>',
+            'long': '<span class="level-badge level-long">🟢 long</span>',
+            'permanent': '<span class="level-badge level-permanent">💎 permanent</span>'
+        };
+
+        function getLevelBadge(level) {
+            return LEVEL_BADGES[level] || LEVEL_BADGES['flash'];
+        }
+
         async function writeKnowledge() {
             const content = document.getElementById('writeContent').value.trim();
             const category = document.getElementById('writeCategory').value.trim() || '通用';
             const tagsInput = document.getElementById('writeTags').value.trim();
             const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()) : [];
+            const level = document.getElementById('writeLevel').value;
             if (!content) { showMessage('writeMessage', '请输入知识内容', 'error'); return; }
             try {
-                const response = await fetch(API_BASE + '/api/write', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({content, category, tags}) });
+                const response = await fetch(API_BASE + '/api/write', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({content, category, tags, memory_level: level})
+                });
                 const result = await response.json();
-                if (result.status === 'success') { showMessage('writeMessage', '✅ ' + result.message, 'success'); document.getElementById('writeContent').value = ''; document.getElementById('writeTags').value = ''; updateStats(); }
-                else { showMessage('writeMessage', '⚠️ ' + result.message, 'error'); }
+                if (result.status === 'success') {
+                    showMessage('writeMessage', '✅ ' + result.message, 'success');
+                    document.getElementById('writeContent').value = '';
+                    document.getElementById('writeTags').value = '';
+                    updateStats();
+                } else {
+                    showMessage('writeMessage', '⚠️ ' + result.message, 'error');
+                }
             } catch (error) { showMessage('writeMessage', '❌ 操作失败: ' + error.message, 'error'); }
         }
+
         async function searchKnowledge() {
             const query = document.getElementById('searchQuery').value.trim();
             if (!query) return;
             const resultsDiv = document.getElementById('searchResults');
             resultsDiv.innerHTML = '<div class="loading">🔍 搜索中...</div>';
             try {
-                const response = await fetch(API_BASE + '/api/search', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query, top_k: parseInt(document.getElementById('topKSlider').value)}) });
+                const response = await fetch(API_BASE + '/api/search', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({query, top_k: parseInt(document.getElementById('topKSlider').value)})
+                });
                 const data = await response.json();
-                if (data.results.length === 0) { resultsDiv.innerHTML = '<div class="loading">😔 没有找到相关知识</div>'; return; }
-                resultsDiv.innerHTML = data.results.map(item => '<div class="result-item"><div class="similarity">' + item.similarity + '% 匹配</div><div><span class="category">' + item.category + '</span>' + item.tags.filter(t => t).map(tag => '<span class="tag">' + tag + '</span>').join('') + '</div><div style="margin-top:10px;line-height:1.6;">' + item.content + '</div><div class="time">📅 ' + item.time + '</div><button class="delete-btn" onclick="deleteKnowledge(\'' + item.id + '\')">🗑️ 删除</button></div>').join('');
+                let html = '';
+                // permanent置顶
+                if (data.permanent && data.permanent.length > 0) {
+                    html += '<div style="margin-bottom:10px;font-size:13px;color:#888;">💎 永久记忆（始终返回）</div>';
+                    data.permanent.forEach(function(item) {
+                        html += '<div class="result-item perm-item">';
+                        html += '<div class="similarity">💎 置顶</div>';
+                        html += '<div>' + getLevelBadge('permanent') + '<span class="category">' + item.category + '</span>';
+                        html += item.tags.filter(t => t).map(t => '<span class="tag">' + t + '</span>').join('');
+                        html += '</div>';
+                        html += '<div style="margin-top:10px;line-height:1.6;">' + item.content + '</div>';
+                        html += '<div class="meta-info">召回 ' + item.recall_count + ' 次 | 保留率 ' + item.retention + '%</div>';
+                        html += '<div class="time">📅 ' + item.time + '</div>';
+                        html += '</div>';
+                    });
+                }
+                // 普通结果
+                if (data.results && data.results.length > 0) {
+                    if (data.permanent && data.permanent.length > 0) {
+                        html += '<div style="margin:15px 0 10px;font-size:13px;color:#888;">📖 语义匹配结果</div>';
+                    }
+                    data.results.forEach(function(item) {
+                        html += '<div class="result-item">';
+                        html += '<div class="similarity">' + item.similarity + '% 匹配</div>';
+                        html += '<div>' + getLevelBadge(item.memory_level) + '<span class="category">' + item.category + '</span>';
+                        html += item.tags.filter(t => t).map(t => '<span class="tag">' + t + '</span>').join('');
+                        html += '</div>';
+                        html += '<div style="margin-top:10px;line-height:1.6;">' + item.content + '</div>';
+                        html += '<div class="meta-info">召回 ' + item.recall_count + ' 次 | 保留率 ' + item.retention + '% | ' + getLevelBadge(item.memory_level) + '</div>';
+                        html += '<div class="time">📅 ' + item.time + '</div>';
+                        html += '<button class="delete-btn" onclick="deleteKnowledge(\'' + item.id + '\')">🗑️ 删除</button>';
+                        html += '</div>';
+                    });
+                }
+                if (!html) {
+                    html = '<div class="loading">😔 没有找到相关知识</div>';
+                }
+                resultsDiv.innerHTML = html;
             } catch (error) { resultsDiv.innerHTML = '<div class="loading">❌ 搜索失败: ' + error.message + '</div>'; }
         }
+
         async function deleteKnowledge(id) {
             if (!confirm('确定要删除这条知识吗？')) return;
             try { await fetch(API_BASE + '/api/delete/' + id, {method: 'DELETE'}); searchKnowledge(); updateStats(); }
             catch (error) { alert('删除失败: ' + error.message); }
         }
+
         async function updateStats() {
-            try { const response = await fetch(API_BASE + '/api/stats'); const data = await response.json(); document.getElementById('totalCount').textContent = data.total; }
-            catch (error) { console.error('获取统计失败', error); }
+            try {
+                const response = await fetch(API_BASE + '/api/stats');
+                const data = await response.json();
+                document.getElementById('totalCount').textContent = data.total;
+                if (data.levels) {
+                    var s = '🔴' + data.levels.flash + ' 🟡' + data.levels.short + ' 🟢' + data.levels.long + ' 💎' + data.levels.permanent;
+                    document.getElementById('levelStats').textContent = s;
+                }
+            } catch (error) { console.error('获取统计失败', error); }
         }
+
         function showMessage(elementId, message, type) {
             const div = document.getElementById(elementId);
             div.innerHTML = '<div class="message ' + type + '">' + message + '</div>';
             setTimeout(() => { div.innerHTML = ''; }, 3000);
         }
+
         setInterval(updateStats, 30000);
-    
+        updateStats();
+
         async function loadList() {
             try {
                 const res = await fetch('/api/list?limit=50');
-
                 const data = await res.json();
                 window._listItems = data.results || [];
                 const div = document.getElementById('listResults');
@@ -186,308 +289,178 @@
                 }
                 let h = '<p style="color:#666;margin-bottom:10px">共 ' + data.total + ' 条，显示前 ' + data.results.length + ' 条</p>';
                 data.results.forEach(function(item) {
-                    var p = item.content.length > 100 ? item.content.substring(0,100) + '...' : item.content;
-                    h += '<div style="background:#f8f9fa;padding:12px;border-radius:8px;margin-bottom:8px;border-left:3px solid #A0D8EF">';
-                    h += '<p style="margin:0 0 5px;font-size:14px">' + p + '</p>';
-                    h += '<div style="display:flex;justify-content:space-between;align-items:center">';
+                    var p = item.content.length > 100 ? item.content.substring(0, 100) + '...' : item.content;
+                    h += '<div style="background:#f8f9fa;padding:12px;border-radius:8px;margin-bottom:8px;border-left:3px solid ' + (item.memory_level === 'permanent' ? '#FFD700' : '#A0D8EF') + '">';
+                    h += '<p style="margin:0 0 5px;font-size:14px">' + getLevelBadge(item.memory_level) + ' ' + p + '</p>';
+                    h += '<div class="meta-info">召回 ' + item.recall_count + ' 次 | 保留率 ' + item.retention + '%</div>';
+                    h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">';
                     h += '<small style="color:#999">' + item.category + ' | ' + item.time + '</small>';
+                    h += '<div>';
+                    if (item.memory_level !== 'permanent') {
+                        h += '<button class="pin-btn" onclick="pinItem(\'' + item.id + '\')" title="标为永久">📌</button>';
+                    }
                     h += '<button onclick="openEditModal(\'' + item.id + '\')" style="background:#A0D8EF;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;margin-right:6px;">✏️</button>';
-                h += '<button data-id="' + item.id + '" onclick="deleteAndRefresh(this.dataset.id)" style="background:#ff6b6b;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px">🗑️</button>';
-                    h += '</div></div>';
+                    h += '<button data-id="' + item.id + '" onclick="deleteAndRefresh(this.dataset.id)" style="background:#ff6b6b;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px">🗑️</button>';
+                    h += '</div></div></div>';
                 });
                 div.innerHTML = h;
             } catch(e) {
                 document.getElementById('listResults').innerHTML = '<p style="color:red">加载失败</p>';
             }
         }
+
         async function deleteAndRefresh(id) {
             if (!confirm('确定删除？')) return;
             await fetch('/api/delete/' + id, {method: 'DELETE'});
             loadList();
+            updateStats();
         }
 
-    
-    // 加载今日信息
-    async function loadToday() {
-      try {
-        const res = await fetch('/api/today');
-        const data = await res.json();
-        let parts = [
-          '📅 ' + data.solar + ' ' + data.weekday,
-          '🏮 ' + data.lunar
-        ];
-        if (data.solar_term) parts.push('🌿 ' + data.solar_term);
-        if (data.festivals && data.festivals.length > 0) {
-          parts.push('<span class="festival">🎉 ' + data.festivals.join(' / ') + '</span>');
+        async function pinItem(id) {
+            if (!confirm('标记为永久记忆？')) return;
+            try {
+                await fetch('/api/set_level/' + id + '?level=permanent', {method: 'POST'});
+                loadList();
+                updateStats();
+            } catch(e) { alert('操作失败'); }
         }
-        document.getElementById('todayBanner').innerHTML = 
-          parts.map(p => '<span class="item">' + p + '</span>').join('<span class="divider">|</span>');
-      } catch(e) {
-        document.getElementById('todayBanner').innerHTML = '<span class="item">📅 日期加载失败</span>';
-      }
-    }
-    loadToday();
 
-   
-    function saveCity() {
-      var city = document.getElementById('cityInput').value;
-    if (city) { localStorage.setItem('weatherCity', city); loadWeather(); }
-    }
-    function loadWeather() {
-      var city = localStorage.getItem('weatherCity') || '北京';
-      document.getElementById('cityInput').value = city;
-      fetch('https://wttr.in/' + city + '?format=3&lang=zh')
-        .then(function(r){ return r.text(); })
-	.then(function(d){ document.getElementById('weatherInfo').innerText = d; })
-	.catch(function(){ document.getElementById('weatherInfo').innerText = '获取失败'; });
-      fetch('https://wttr.in/' + city + '?format=%t+%C&lang=zh')
-        .then(function(r){ return r.text(); })
-        .then(function(d){ document.getElementById('weatherForecast').innerText = d; });
-    }
-    loadWeather();
+        async function doCleanup() {
+            var threshold = parseFloat(document.getElementById('cleanupThreshold').value) || 0.05;
+            if (!confirm('确定清理衰减率低于 ' + (threshold * 100) + '% 的记忆？')) return;
+            try {
+                const res = await fetch('/api/cleanup', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({threshold: threshold})
+                });
+                const data = await res.json();
+                document.getElementById('cleanupResult').innerHTML = '<div class="message success">' + data.message + '</div>';
+                updateStats();
+            } catch(e) {
+                document.getElementById('cleanupResult').innerHTML = '<div class="message error">清理失败</div>';
+            }
+        }
 
+        // 今日信息
+        async function loadToday() {
+            try {
+                const res = await fetch('/api/today');
+                const data = await res.json();
+                let parts = ['📅 ' + data.solar + ' ' + data.weekday, '🏮 ' + data.lunar];
+                if (data.solar_term) parts.push('🌿 ' + data.solar_term);
+                if (data.festivals && data.festivals.length > 0) {
+                    parts.push('<span class="festival">🎉 ' + data.festivals.join(' / ') + '</span>');
+                }
+                document.getElementById('todayBanner').innerHTML = parts.map(p => '<span class="item">' + p + '</span>').join('<span class="divider">|</span>');
+            } catch(e) {
+                document.getElementById('todayBanner').innerHTML = '<span class="item">📅 日期加载失败</span>';
+            }
+        }
+        loadToday();
 
-    // 纪念日管理
-    async function addAnniversary() {
-      const name = document.getElementById('annivName').value.trim();
-      const type = document.getElementById('annivType').value;
-      const date = document.getElementById('annivDate').value.trim();
-      
-      if (!name || !date) {
-        alert('请填写纪念日名称和日期');
-        return;
-      }
-      
-      try {
-        const res = await fetch('/api/write', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            content: name,
-            category: '纪念日',
-            tags: [date, type]
-          })
-        });
-        const data = await res.json();
-        if (data.id) {
-          alert('✅ 纪念日已添加！');
-          document.getElementById('annivName').value = '';
-          document.getElementById('annivDate').value = '';
-          loadAnniversaries();
-          loadToday();
-        } else {
-          alert('❌ 添加失败');
+        // 天气
+        function saveCity() {
+            var city = document.getElementById('cityInput').value;
+            if (city) { localStorage.setItem('weatherCity', city); loadWeather(); }
         }
-      } catch(e) {
-        alert('❌ 网络错误');
-      }
-    }
-    
-    async function loadAnniversaries() {
-      try {
-        const res = await fetch('/api/list');
-        const data = await res.json();
-        const items = data.results || data.items || data;
-        const annivs = items.filter(item => item.category === '纪念日');
-        const container = document.getElementById('annivList');
-        if (annivs.length === 0) {
-          container.innerHTML = '<p style="color:#999;text-align:center;">暂无纪念日</p>';
-          return;
+        function loadWeather() {
+            var city = localStorage.getItem('weatherCity') || '北京';
+            document.getElementById('cityInput').value = city;
+            fetch('https://wttr.in/' + city + '?format=3&lang=zh')
+                .then(r => r.text())
+                .then(d => { document.getElementById('weatherInfo').innerText = d; })
+                .catch(() => { document.getElementById('weatherInfo').innerText = '获取失败'; });
+            fetch('https://wttr.in/' + city + '?format=%t+%C&lang=zh')
+                .then(r => r.text())
+                .then(d => { document.getElementById('weatherForecast').innerText = d; });
         }
-        let h = '';
-        for (const item of annivs) {
-          const tags = (item.tags || []).join(' ');
-          const id = item.id || item.pk;
-          h += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;margin:4px 0;background:#f9f9f9;border-radius:8px;">
-            <span>💝 \({item.content} <small style="color:#999;">(\){tags})</small></span>
-            <button onclick="deleteAnniversary('${id}',this)" style="background:#ff6b6b;color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;">删除</button>
-          </div>`;
-        }
-        container.innerHTML = h;
-      } catch(e) {
-        console.error('loadAnniversaries error:', e);
-        document.getElementById('annivList').innerHTML = '<p style="color:#e74c3c;">加载失败</p>';
-      }
-    }
-    
-    async function deleteAnniversary(id, btn) {
-      if (!confirm('确定删除这个纪念日？')) return;
-      try {
-        const res = await fetch('/api/delete/' + id, {method:'DELETE'});
-        const data = await res.json();
-        if (data.message) {
-          btn.parentElement.remove();
-          loadToday();
-        }
-      } catch(e) {
-        alert('删除失败');
-      }
-    }
-    
-    loadAnniversaries();
+        loadWeather();
 
-  </script>
-
-<!-- 编辑弹窗 -->
-<div id="editModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;">
-  <div style="background:white; border-radius:16px; padding:24px; width:90%; max-width:500px; max-height:80vh; overflow-y:auto; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);">
-    <h3 style="margin:0 0 16px 0; color:#333;">✏️ 编辑知识</h3>
-    <input type="hidden" id="editId">
-    <div style="margin-bottom:12px;">
-      <label style="display:block; font-size:14px; color:#666; margin-bottom:4px;">内容</label>
-      <textarea id="editContent" rows="6" style="width:100%; padding:10px; border:2px solid #e0e0e0; border-radius:10px; font-size:14px; resize:vertical; box-sizing:border-box;"></textarea>
-    </div>
-    <div style="margin-bottom:12px;">
-      <label style="display:block; font-size:14px; color:#666; margin-bottom:4px;">分类</label>
-      <input type="text" id="editCategory" style="width:100%; padding:10px; border:2px solid #e0e0e0; border-radius:10px; font-size:14px; box-sizing:border-box;">
-    </div>
-    <div style="margin-bottom:16px;">
-      <label style="display:block; font-size:14px; color:#666; margin-bottom:4px;">标签（逗号分隔）</label>
-      <input type="text" id="editTags" style="width:100%; padding:10px; border:2px solid #e0e0e0; border-radius:10px; font-size:14px; box-sizing:border-box;">
-    </div>
-    <div style="display:flex; gap:10px;">
-      <button onclick="closeEditModal()" style="flex:1; padding:12px; border:2px solid #e0e0e0; background:white; border-radius:10px; font-size:15px; cursor:pointer;">取消</button>
-      <button onclick="saveEdit()" style="flex:1; padding:12px; border:none; background:#A0D8EF; color:white; border-radius:10px; font-size:15px; font-weight:bold; cursor:pointer;">💾 保存</button>
-    </div>
-  </div>
-</div>
-<script>
-function openEditModal(id) {
-    const items = window._listItems || [];
-    const item = items.find(i => i.id === id);
-    if (!item) { alert('找不到该条目'); return; }
-    document.getElementById('editId').value = id;
-    document.getElementById('editContent').value = item.content || '';
-    document.getElementById('editCategory').value = item.category || '通用';
-    document.getElementById('editTags').value = (item.tags || []).filter(t => t).join(',');
-    document.getElementById('editModal').style.display = 'block';
-}
-function closeEditModal() {
-    document.getElementById('editModal').style.display = 'none';
-}
-async function saveEdit() {
-    const id = document.getElementById('editId').value;
-    const content = document.getElementById('editContent').value.trim();
-    const category = document.getElementById('editCategory').value.trim() || '通用';
-    const tags = document.getElementById('editTags').value.split(',').map(t => t.trim()).filter(t => t);
-    if (!content) { alert('内容不能为空'); return; }
-    try {
-        const res = await fetch('/api/update/' + id, {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({content, category, tags})
-        });
-        if (res.ok) {
-            closeEditModal();
-            loadList();
-        } else {
-            const data = await res.json();
-            alert('更新失败: ' + (data.detail || '未知错误'));
+        // 纪念日
+        async function addAnniversary() {
+            const name = document.getElementById('annivName').value.trim();
+            const type = document.getElementById('annivType').value;
+            const date = document.getElementById('annivDate').value.trim();
+            if (!name || !date) { alert('请填写纪念日名称和日期'); return; }
+            try {
+                const res = await fetch('/api/write', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ content: name, category: '纪念日', tags: [date, type], memory_level: 'permanent' })
+                });
+                const data = await res.json();
+                if (data.id) {
+                    alert('✅ 纪念日已添加！');
+                    document.getElementById('annivName').value = '';
+                    document.getElementById('annivDate').value = '';
+                    loadAnniversaries();
+                    loadToday();
+                } else { alert('❌ 添加失败'); }
+            } catch(e) { alert('❌ 网络错误'); }
         }
-    } catch(e) { alert('请求失败: ' + e.message); }
-}
-document.getElementById('editModal').addEventListener('click', function(e) {
-    if (e.target === this) closeEditModal();
-});
 
-    // 加载今日信息
-    async function loadToday() {
-      try {
-        const res = await fetch('/api/today');
-        const data = await res.json();
-        let parts = [
-          '📅 ' + data.solar + ' ' + data.weekday,
-          '🏮 ' + data.lunar
-        ];
-        if (data.solar_term) parts.push('🌿 ' + data.solar_term);
-        if (data.festivals && data.festivals.length > 0) {
-          parts.push('<span class="festival">🎉 ' + data.festivals.join(' / ') + '</span>');
+        async function loadAnniversaries() {
+            try {
+                const res = await fetch('/api/list');
+                const data = await res.json();
+                const annivs = (data.results || []).filter(item => item.category === '纪念日');
+                const container = document.getElementById('annivList');
+                if (annivs.length === 0) {
+                    container.innerHTML = '<p style="color:#999;text-align:center;">暂无纪念日</p>';
+                    return;
+                }
+                container.innerHTML = annivs.map(item => {
+                    const tags = (item.tags || []).join(' ');
+                    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;margin:4px 0;background:#f9f9f9;border-radius:8px;">' +
+                        '<span>💝 ' + item.content + ' <small style="color:#999;">(' + tags + ')</small></span>' +
+                        '<button onclick="deleteAnniversary(\'' + item.id + '\',this)" style="background:#ff6b6b;color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;">删除</button>' +
+                    '</div>';
+                }).join('');
+            } catch(e) {
+                document.getElementById('annivList').innerHTML = '<p style="color:#e74c3c;">加载失败</p>';
+            }
         }
-        document.getElementById('todayBanner').innerHTML = 
-          parts.map(p => '<span class="item">' + p + '</span>').join('<span class="divider">|</span>');
-      } catch(e) {
-        document.getElementById('todayBanner').innerHTML = '<span class="item">📅 日期加载失败</span>';
-      }
-    }
-    loadToday();
 
-  
-    // 纪念日管理
-    async function addAnniversary() {
-      const name = document.getElementById('annivName').value.trim();
-      const type = document.getElementById('annivType').value;
-      const date = document.getElementById('annivDate').value.trim();
-      
-      if (!name || !date) {
-        alert('请填写纪念日名称和日期');
-        return;
-      }
-      
-      try {
-        const res = await fetch('/api/write', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            content: name,
-            category: '纪念日',
-            tags: [date, type]
-          })
-        });
-        const data = await res.json();
-        if (data.id) {
-          alert('✅ 纪念日已添加！');
-          document.getElementById('annivName').value = '';
-          document.getElementById('annivDate').value = '';
-          loadAnniversaries();
-          loadToday();
-        } else {
-          alert('❌ 添加失败');
+        async function deleteAnniversary(id, btn) {
+            if (!confirm('确定删除这个纪念日？')) return;
+            try {
+                const res = await fetch('/api/delete/' + id, {method: 'DELETE'});
+                const data = await res.json();
+                if (data.message) { btn.parentElement.remove(); loadToday(); }
+            } catch(e) { alert('删除失败'); }
         }
-      } catch(e) {
-        alert('❌ 网络错误');
-      }
-    }
-    
-    async function loadAnniversaries() {
-      try {
-        const res = await fetch('/api/list');
-        const data = await res.json();
-        const annivs = (data.results || data.items || data).filter(item => item.category === '纪念日');
-        const container = document.getElementById('annivList');
-        if (annivs.length === 0) {
-          container.innerHTML = '<p style="color:#999;text-align:center;">暂无纪念日</p>';
-          return;
-        }
-        container.innerHTML = annivs.map(item => {
-          const tags = (item.tags || []).join(' ');
-          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;margin:4px 0;background:#f9f9f9;border-radius:8px;">' +
-            '<span>💝 ' + item.content + ' <small style="color:#999;">(' + tags + ')</small></span>' +
-            '<button onclick="deleteAnniversary(\''+item.id+'\',this)" style="background:#ff6b6b;color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;">删除</button>' +
-          '</div>';
-        }).join('');
-      } catch(e) {
-        document.getElementById('annivList').innerHTML = '<p style="color:#e74c3c;">加载失败</p>';
-      }
-    }
-    
-    async function deleteAnniversary(id, btn) {
-      if (!confirm('确定删除这个纪念日？')) return;
-      try {
-        const res = await fetch('/api/delete/' + id, {method:'DELETE'});
-        const data = await res.json();
-        if (data.message) {
-          btn.parentElement.remove();
-          loadToday();
-        }
-      } catch(e) {
-        alert('删除失败');
-      }
-    }
-    
-    // 页面加载时也加载纪念日列表
-    loadAnniversaries();
+        loadAnniversaries();
 
-  </script>
-
+        // 编辑弹窗
+        function openEditModal(id) {
+            const items = window._listItems || [];
+            const item = items.find(i => i.id === id);
+            if (!item) { alert('找不到该条目'); return; }
+            document.getElementById('editId').value = id;
+            document.getElementById('editContent').value = item.content || '';
+            document.getElementById('editCategory').value = item.category || '通用';
+            document.getElementById('editTags').value = (item.tags || []).filter(t => t).join(',');
+            document.getElementById('editModal').style.display = 'block';
+        }
+        function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
+        async function saveEdit() {
+            const id = document.getElementById('editId').value;
+            const content = document.getElementById('editContent').value.trim();
+            const category = document.getElementById('editCategory').value.trim() || '通用';
+            const tags = document.getElementById('editTags').value.split(',').map(t => t.trim()).filter(t => t);
+            if (!content) { alert('内容不能为空'); return; }
+            try {
+                const res = await fetch('/api/update/' + id, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({content, category, tags})
+                });
+                if (res.ok) { closeEditModal(); loadList(); }
+                else { const data = await res.json(); alert('更新失败: ' + (data.detail || '未知错误')); }
+            } catch(e) { alert('请求失败: ' + e.message); }
+        }
+        document.getElementById('editModal').addEventListener('click', function(e) { if (e.target === this) closeEditModal(); });
+    </script>
 </body>
 </html>

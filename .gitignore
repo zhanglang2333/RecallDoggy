@@ -8,3 +8,4 @@ install_*
 start.sh
 __pycache__/
 venv/
+metadata.db
