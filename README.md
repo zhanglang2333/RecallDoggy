@@ -12,7 +12,6 @@
 - 🖥️ **前端页面** - 可视化管理知识库
 - 🧠 **分层记忆** - flash/short/long/permanent 四级记忆 + 艾宾浩斯衰减
 - 🌤️ **天气查询** - mcp_weather 工具
-## 🚀 快速开始
 
 ## 🧠 分层记忆系统
 
@@ -26,6 +25,8 @@
 - 衰减公式：`R = e^(-t/S)`（t=小时数，S=强度系数）
 - 搜索加权：`final_score = similarity × 0.7 + retention × 0.3`
 - permanent 记忆不管搜什么都会返回，不占 top_k 名额
+
+## 🚀 快速开始
 
 ### 1. 克隆仓库
 
