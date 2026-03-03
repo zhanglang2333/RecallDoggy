@@ -125,19 +125,18 @@ docker build -t recalldoggy .
 docker run -d -p 8000:8000 --env-file .env recalldoggy
 ```
 
-## 🛠️ MCP 工具列表
+# 🛠️ MCP 工具列表
 
-| 工具 | 说明 |
-|---|---|
-| `mcp_write` | 写入记忆 |
-| `mcp_search` | 语义搜索记忆 |
-| `mcp_list` | 列出所有记忆 |
-| `mcp_edit` | 编辑记忆 |
-| `mcp_delete` | 删除记忆 |
-| `mcp_add_anniversary` | 添加纪念日 |
-| `mcp_search_anniversary` | 查询纪念日 |
-| `mcp_delete_anniversary` | 删除纪念日 |
-| `mcp_today` | 获取今日信息（农历/节气/节日/纪念日） |
+| 工具 | 功能 | 必填参数 | 可选参数 |
+|------|------|----------|----------|
+| `mcp_write` | 写入记忆 | content | category, tags |
+| `mcp_search` | 语义搜索（含 permanent 置顶） | query | top_k（默认5） |
+| `mcp_delete` | 删除记忆 | doc_id | - |
+| `mcp_stats` | 知识库统计（含各层级数量） | - | - |
+| `mcp_today` | 今日信息（农历/节气/节日/纪念日） | - | - |
+| `mcp_weather` | 天气查询 | - | city（默认天津） |
+
+（因为我是天津人所以默认的天津(￣^￣)ゞ）
 
 ## 📋 环境要求
 
