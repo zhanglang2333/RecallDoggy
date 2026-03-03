@@ -48,7 +48,10 @@ pip install -r requirements.txt
 ```env
 ZILLIZ_URI=你的Zilliz Cloud地址
 ZILLIZ_TOKEN=你的Zilliz Cloud Token
+HEFENG_API_KEY=你的和风天气API Key（可选）
 ```
+
+> SQLite 数据库（metadata.db）运行时自动创建，无需配置。
 
 ### 4. 启动服务
 
