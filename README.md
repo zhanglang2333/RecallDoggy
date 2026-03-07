@@ -128,6 +128,22 @@ docker build -t recalldoggy .
 docker run -d -p 8001:8001 --env-file .env recalldoggy
 ```
 
+## 健康检查
+
+```
+GET /health
+```
+
+无需登录，返回服务状态。
+
+## 数据导出
+
+```
+GET /api/export
+```
+
+需登录，导出全部记忆为JSON。
+
 ## 更新
 
 ```bash
