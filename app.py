@@ -44,7 +44,7 @@ def set_password_hash(password: str):
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        public_paths = ["/login", "/setup", "/favicon.ico"]
+        public_paths = ["/login", "/setup", "/favicon.ico", "/health"]
         if request.url.path in public_paths:
             return await call_next(request)
         if not get_password_hash():
@@ -169,6 +169,14 @@ async def logout(request: Request):
     request.session.clear()
     return RedirectResponse(url="/login")
 
+@app.get("/health")
+async def health():
+    return {
+        "status": "ok",
+        "version": "1.4.0",
+        "entities": collection.num_entities if collection else 0
+    }
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     return templates.TemplateResponse("index.html", {
@@ -248,6 +256,31 @@ async def list_knowledge(limit: int = 50, offset: int = 0):
                 "time": datetime.fromtimestamp(r.get("timestamp", 0) / 1000).strftime("%Y-%m-%d %H:%M")
             })
         return {"results": items, "total": collection.num_entities}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/export")
+async def export_all():
+    try:
+        all_data = collection.query(
+            expr='id != ""',
+            output_fields=["id", "content", "category", "tags", "timestamp"],
+            limit=16384
+        )
+        items = []
+        for r in all_data:
+            items.append({
+                "id": r.get("id"),
+                "content": r.get("content"),
+                "category": r.get("category"),
+                "tags": r.get("tags", "").split(","),
+                "timestamp": r.get("timestamp", 0)
+            })
+        return {
+            "exported_at": datetime.now().isoformat(),
+            "total": len(items),
+            "data": items
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
