@@ -12,3 +12,5 @@ metadata.db
 .auth
 .auth
 .env
+.auth
+.env
