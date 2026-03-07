@@ -132,6 +132,7 @@ docker run -d -p 8001:8001 --env-file .env recalldoggy
 
 ```bash
 bash update.sh
+```
 
 # 🛠️ MCP 工具列表
 
