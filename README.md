@@ -61,7 +61,7 @@ HEFENG_API_KEY=你的和风天气API Key（可选）
 python app.py
 ```
 
-服务启动在 `http://0.0.0.0:8000`，MCP 端点为 `/sse`
+服务启动在 `http://0.0.0.0:8001`，MCP 端点为 `/sse`
 
 **stdio 模式（本地直连）：**
 
@@ -79,7 +79,7 @@ python app.py --stdio
 {
   "mcpServers": {
     "RecallDoggy": {
-      "url": "http://你的服务器IP:8000/sse"
+      "url": "http://你的服务器IP:8001/sse"
     }
   }
 }
@@ -125,7 +125,7 @@ python app.py --stdio
 
 ```bash
 docker build -t recalldoggy .
-docker run -d -p 8000:8000 --env-file .env recalldoggy
+docker run -d -p 8001:8001 --env-file .env recalldoggy
 ```
 
 # 🛠️ MCP 工具列表
