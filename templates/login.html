@@ -1,0 +1,99 @@
+<!DOCTYPE html> <html lang="zh-CN"> 
+<head> <meta charset="UTF-8"> <meta 
+name="viewport" 
+content="width=device-width, 
+initial-scale=1.0"> <title>登录 - 
+RecallDoggy</title> <style> * { 
+margin:0; padding:0; 
+box-sizing:border-box; } body {
+    font-family: -apple-system, 
+    BlinkMacSystemFont, "Segoe UI", 
+    Roboto, sans-serif; height: 
+    100vh; display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    background: 
+    linear-gradient(135deg, 
+    #A0D8EF, #7CC2DE);
+}
+.login-box { background: white; 
+    padding: 40px; border-radius: 
+    16px; width: 320px; box-shadow: 
+    0 15px 40px rgba(0,0,0,0.2);
+}
+h2 { text-align: center; 
+margin-bottom: 25px; color: #333; } 
+input {
+    width: 100%; padding: 12px; 
+    margin-bottom: 15px; border: 
+    2px solid #e0e0e0; 
+    border-radius: 8px; font-size: 
+    14px;
+}
+input:focus { outline: none; 
+border-color: #A0D8EF; } button {
+    width: 100%; padding: 12px; 
+    border: none; border-radius: 
+    8px; background: 
+    linear-gradient(135deg, 
+    #A0D8EF, #7CC2DE);
+    color: white; font-size: 16px; 
+    font-weight: bold; cursor: 
+    pointer;
+}
+button:hover { opacity: 0.9; } 
+button:disabled { opacity: 0.5; 
+cursor: not-allowed; } .message { 
+text-align: center; margin-top: 
+10px; font-size: 14px; color: red; 
+}
+</style> </head> <body> <div 
+class="login-box">
+    <h2>🐕 RecallDoggy</h2> <input 
+    id="password" type="password" 
+    placeholder="密码"
+           onkeypress="if(event.key==='Enter') 
+           login()">
+    <button id="btn" 
+    onclick="login()">登录</button> 
+    <div id="msg" 
+    class="message"></div>
+</div> <script> async function 
+login() {
+    const pass = 
+    document.getElementById("password").value; 
+    const btn = 
+    document.getElementById("btn"); 
+    const msg = 
+    document.getElementById("msg"); 
+    if (!pass) { msg.innerText = 
+    "请输入密码"; return; } 
+    btn.disabled = true; 
+    btn.innerText = "登录中..."; 
+    try {
+        const res = await 
+        fetch("/login", {
+            method: "POST", 
+            headers: 
+            {"Content-Type": 
+            "application/json"}, 
+            body: 
+            JSON.stringify({password: 
+            pass})
+        });
+        const data = await 
+        res.json(); if 
+        (data.success) {
+            window.location.href = 
+            "/";
+        } else {
+            msg.innerText = 
+            data.msg;
+        }
+    } catch(e) {
+        msg.innerText = "网络错误";
+    }
+    btn.disabled = false; 
+    btn.innerText = "登录";
+}
+</script> </body> </html>

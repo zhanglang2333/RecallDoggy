@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧠 AI RAG 知识库</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: linear-gradient(135deg, #A0D8EF 0%, #7CC2DE 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { text-align: center; color: white; margin-bottom: 30px; }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .stats { background: rgba(255,255,255,0.2); padding: 10px 20px; border-radius: 20px; display: inline-block; }
+        .card { background: white; border-radius: 15px; padding: 25px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .card h2 { color: #A0D8EF; margin-bottom: 20px; font-size: 1.5em; }
+        textarea, input[type="text"] { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; font-family: inherit; margin-bottom: 15px; transition: border 0.3s; }
+        textarea:focus, input:focus { outline: none; border-color: #A0D8EF; }
+        textarea { min-height: 120px; resize: vertical; }
+        button { background: linear-gradient(135deg, #A0D8EF 0%, #7CC2DE 100%); color: white; border: none; padding: 12px 30px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+        button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102,126,234,0.4); }
+        button:active { transform: translateY(0); }
+        .result-item { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #A0D8EF; position: relative; }
+        .result-item:hover { background: #e9ecef; }
+        .similarity { position: absolute; top: 15px; right: 15px; background: #A0D8EF; color: white; padding: 5px 12px; border-radius: 15px; font-size: 12px; font-weight: 600; }
+        .category { display: inline-block; background: #7CC2DE; color: white; padding: 3px 10px; border-radius: 12px; font-size: 12px; margin-right: 5px; }
+        .tag { display: inline-block; background: #e0e0e0; padding: 3px 10px; border-radius: 12px; font-size: 12px; margin-right: 5px; margin-top: 5px; }
+        .time { color: #999; font-size: 12px; margin-top: 10px; }
+        .delete-btn { background: #dc3545; padding: 5px 12px; font-size: 12px; margin-top: 10px; }
+        .loading { text-align: center; padding: 20px; color: #999; }
+        .message { padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: 500; }
+        .message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } .header h1 { font-size: 1.8em; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧠 AI RAG 知识库</h1>
+            <div class="stats">📚 总知识数：<strong id="totalCount">{{ total }}</strong></div>
+        </div>
+        <div class="grid">
+            <div class="card">
+                <h2>✍️ 写入知识</h2>
+                <div id="writeMessage"></div>
+                <textarea id="writeContent" placeholder="输入知识内容..."></textarea>
+                <input type="text" id="writeCategory" placeholder="分类（如：技术、生活）" value="通用">
+                <input type="text" id="writeTags" placeholder="标签（逗号分隔，如：Python,AI）">
+                <button onclick="writeKnowledge()">💾 保存到知识库</button>
+            </div>
+            <div class="card">
+                <h2>🔍 搜索知识</h2>
+                <input type="text" id="searchQuery" placeholder="输入搜索关键词..." onkeypress="if(event.key==='Enter') searchKnowledge()">
+                            <div style="margin-bottom: 15px;">
+                <label style="font-size: 14px; color: #666;">
+                    返回条数：<strong id="topKValue">5</strong>
+                </label>
+                <input type="range" id="topKSlider" min="1" max="20" value="5"
+                    style="width: 100%; margin-top: 5px; accent-color: #A0D8EF;"
+                    oninput="document.getElementById('topKValue').textContent = this.value">
+            </div>
+            <button onclick="searchKnowledge()">🔎 搜索</button>
+            </div>
+        </div>
+        <div class="card">
+            <h2>📖 搜索结果</h2>
+            <div id="searchResults"><div class="loading">输入关键词开始搜索...</div></div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h2>📋 知识列表</h2>
+        <button onclick="loadList()">📋 加载全部</button>
+        <div id="listResults" style="margin-top:15px;"></div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+        async function writeKnowledge() {
+            const content = document.getElementById('writeContent').value.trim();
+            const category = document.getElementById('writeCategory').value.trim() || '通用';
+            const tagsInput = document.getElementById('writeTags').value.trim();
+            const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()) : [];
+            if (!content) { showMessage('writeMessage', '请输入知识内容', 'error'); return; }
+            try {
+                const response = await fetch(API_BASE + '/api/write', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({content, category, tags}) });
+                const result = await response.json();
+                if (result.status === 'success') { showMessage('writeMessage', '✅ ' + result.message, 'success'); document.getElementById('writeContent').value = ''; document.getElementById('writeTags').value = ''; updateStats(); }
+                else { showMessage('writeMessage', '⚠️ ' + result.message, 'error'); }
+            } catch (error) { showMessage('writeMessage', '❌ 操作失败: ' + error.message, 'error'); }
+        }
+        async function searchKnowledge() {
+            const query = document.getElementById('searchQuery').value.trim();
+            if (!query) return;
+            const resultsDiv = document.getElementById('searchResults');
+            resultsDiv.innerHTML = '<div class="loading">🔍 搜索中...</div>';
+            try {
+                const response = await fetch(API_BASE + '/api/search', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query, top_k: parseInt(document.getElementById('topKSlider').value)}) });
+                const data = await response.json();
+                if (data.results.length === 0) { resultsDiv.innerHTML = '<div class="loading">😔 没有找到相关知识</div>'; return; }
+                resultsDiv.innerHTML = data.results.map(item => '<div class="result-item"><div class="similarity">' + item.similarity + '% 匹配</div><div><span class="category">' + item.category + '</span>' + item.tags.filter(t => t).map(tag => '<span class="tag">' + tag + '</span>').join('') + '</div><div style="margin-top:10px;line-height:1.6;">' + item.content + '</div><div class="time">📅 ' + item.time + '</div><button class="delete-btn" onclick="deleteKnowledge(\'' + item.id + '\')">🗑️ 删除</button></div>').join('');
+            } catch (error) { resultsDiv.innerHTML = '<div class="loading">❌ 搜索失败: ' + error.message + '</div>'; }
+        }
+        async function deleteKnowledge(id) {
+            if (!confirm('确定要删除这条知识吗？')) return;
+            try { await fetch(API_BASE + '/api/delete/' + id, {method: 'DELETE'}); searchKnowledge(); updateStats(); }
+            catch (error) { alert('删除失败: ' + error.message); }
+        }
+        async function updateStats() {
+            try { const response = await fetch(API_BASE + '/api/stats'); const data = await response.json(); document.getElementById('totalCount').textContent = data.total; }
+            catch (error) { console.error('获取统计失败', error); }
+        }
+        function showMessage(elementId, message, type) {
+            const div = document.getElementById(elementId);
+            div.innerHTML = '<div class="message ' + type + '">' + message + '</div>';
+            setTimeout(() => { div.innerHTML = ''; }, 3000);
+        }
+        setInterval(updateStats, 30000);
+    
+        async function loadList() {
+            try {
+                const res = await fetch('/api/list?limit=50');
+                const data = await res.json();
+                const div = document.getElementById('listResults');
+                if (!data.results.length) {
+                    div.innerHTML = '<p style="color:#666">暂无知识</p>';
+                    return;
+                }
+                let h = '<p style="color:#666;margin-bottom:10px">共 ' + data.total + ' 条，显示前 ' + data.results.length + ' 条</p>';
+                data.results.forEach(function(item) {
+                    var p = item.content.length > 100 ? item.content.substring(0,100) + '...' : item.content;
+                    h += '<div style="background:#f8f9fa;padding:12px;border-radius:8px;margin-bottom:8px;border-left:3px solid #A0D8EF">';
+                    h += '<p style="margin:0 0 5px;font-size:14px">' + p + '</p>';
+                    h += '<div style="display:flex;justify-content:space-between;align-items:center">';
+                    h += '<small style="color:#999">' + item.category + ' | ' + item.time + '</small>';
+                    h += '<button data-id="' + item.id + '" onclick="deleteAndRefresh(this.dataset.id)" style="background:#ff6b6b;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px">🗑️</button>';
+                    h += '</div></div>';
+                });
+                div.innerHTML = h;
+            } catch(e) {
+                document.getElementById('listResults').innerHTML = '<p style="color:red">加载失败</p>';
+            }
+        }
+        async function deleteAndRefresh(id) {
+            if (!confirm('确定删除？')) return;
+            await fetch('/api/delete/' + id, {method: 'DELETE'});
+            loadList();
+        }
+
+    </script>
+</body>
+</html>
