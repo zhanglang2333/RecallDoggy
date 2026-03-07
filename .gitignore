@@ -9,3 +9,6 @@ start.sh
 __pycache__/
 venv/
 metadata.db
+.auth
+.auth
+.env
