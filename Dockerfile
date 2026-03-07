@@ -10,6 +10,6 @@ RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTr
 COPY app.py .
 COPY templates/ templates/
 
-EXPOSE 8000
+EXPOSE 8001
 
 CMD ["python", "app.py"]
