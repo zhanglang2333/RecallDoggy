@@ -135,7 +135,6 @@
         </div>
     </div>
 
-    <!-- 编辑弹窗 -->
     <div id="editModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;">
         <div style="background:white; border-radius:16px; padding:24px; width:90%; max-width:500px; max-height:80vh; overflow-y:auto; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);">
             <h3 style="margin:0 0 16px 0; color:#333;">✏️ 编辑知识</h3>
@@ -210,7 +209,6 @@
                 });
                 const data = await response.json();
                 let html = '';
-                // permanent置顶
                 if (data.permanent && data.permanent.length > 0) {
                     html += '<div style="margin-bottom:10px;font-size:13px;color:#888;">💎 永久记忆（始终返回）</div>';
                     data.permanent.forEach(function(item) {
@@ -225,7 +223,6 @@
                         html += '</div>';
                     });
                 }
-                // 普通结果
                 if (data.results && data.results.length > 0) {
                     if (data.permanent && data.permanent.length > 0) {
                         html += '<div style="margin:15px 0 10px;font-size:13px;color:#888;">📖 语义匹配结果</div>';
@@ -342,7 +339,6 @@
             }
         }
 
-        // 今日信息
         async function loadToday() {
             try {
                 const res = await fetch('/api/today');
@@ -359,7 +355,6 @@
         }
         loadToday();
 
-        // 天气
         function saveCity() {
             var city = document.getElementById('cityInput').value;
             if (city) { localStorage.setItem('weatherCity', city); loadWeather(); }
@@ -367,17 +362,16 @@
         function loadWeather() {
             var city = localStorage.getItem('weatherCity') || '北京';
             document.getElementById('cityInput').value = city;
-            fetch('https://wttr.in/' + city + '?format=3&lang=zh')
+            fetch('https://wttr.in/' + city + '?format=3&lang=zh&m')
                 .then(r => r.text())
                 .then(d => { document.getElementById('weatherInfo').innerText = d; })
                 .catch(() => { document.getElementById('weatherInfo').innerText = '获取失败'; });
-            fetch('https://wttr.in/' + city + '?format=%t+%C&lang=zh')
+            fetch('https://wttr.in/' + city + '?format=%t+%C&lang=zh&m')
                 .then(r => r.text())
                 .then(d => { document.getElementById('weatherForecast').innerText = d; });
         }
         loadWeather();
 
-        // 纪念日
         async function addAnniversary() {
             const name = document.getElementById('annivName').value.trim();
             const type = document.getElementById('annivType').value;
@@ -432,7 +426,6 @@
         }
         loadAnniversaries();
 
-        // 编辑弹窗
         function openEditModal(id) {
             const items = window._listItems || [];
             const item = items.find(i => i.id === id);
