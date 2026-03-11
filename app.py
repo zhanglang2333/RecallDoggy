@@ -20,6 +20,20 @@ from typing import List
 from datetime import datetime, timedelta, timezone
 import cnlunar
 import hashlib
+import logging
+from logging.handlers import RotatingFileHandler
+
+# === 日志 ===
+LOG_DIR = os.path.join(os.path.dirname(__file__), "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+logger = logging.getLogger("recalldoggy")
+logger.setLevel(logging.INFO)
+_fh = RotatingFileHandler(os.path.join(LOG_DIR, "app.log"), maxBytes=5*1024*1024, backupCount=3, encoding="utf-8")
+_fh.setFormatter(logging.Formatter('%(asctime)s | %(levelname)s | %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
+logger.addHandler(_fh)
+_ch = logging.StreamHandler()
+_ch.setFormatter(logging.Formatter('%(asctime)s | %(levelname)s | %(message)s', datefmt='%H:%M:%S'))
+logger.addHandler(_ch)
 
 ZILLIZ_URI = os.getenv("ZILLIZ_URI")
 ZILLIZ_TOKEN = os.getenv("ZILLIZ_TOKEN")
@@ -41,6 +55,19 @@ def set_password_hash(password: str):
     h = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     with open(AUTH_FILE, "w") as f:
         f.write(h)
+
+class RequestLogMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        start = time.time()
+        if request.url.path in ["/favicon.ico", "/health"]:
+            return await call_next(request)
+        response = await call_next(request)
+        duration = round((time.time() - start) * 1000, 1)
+        ip = request.client.host if request.client else "unknown"
+        status = response.status_code
+        level = logging.WARNING if status >= 400 else logging.INFO
+        logger.log(level, f"{request.method} {request.url.path} | {status} | {duration}ms | {ip}")
+        return response
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -81,6 +108,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RequestLogMiddleware)
 
 templates = Jinja2Templates(directory="templates")
 
@@ -101,11 +129,11 @@ class UpdateRequest(BaseModel):
 @app.on_event("startup")
 async def startup():
     global encoder, collection
-    print("启动服务...")
+    logger.info("启动服务...")
     connections.connect(alias="default", uri=ZILLIZ_URI, token=ZILLIZ_TOKEN)
-    print("已连接 Zilliz")
+    logger.info("已连接 Zilliz")
     encoder = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
-    print("模型加载成功")
+    logger.info("模型加载成功")
     if utility.has_collection(COLLECTION_NAME):
         collection = Collection(COLLECTION_NAME)
     else:
@@ -122,7 +150,7 @@ async def startup():
         index_params = {"metric_type": "COSINE", "index_type": "AUTOINDEX", "params": {}}
         collection.create_index(field_name="embedding", index_params=index_params)
     collection.load()
-    print(f"知识库就绪，当前知识数：{collection.num_entities}")
+    logger.info(f"知识库就绪，当前知识数：{collection.num_entities}")
 
 @app.get("/setup", response_class=HTMLResponse)
 async def setup_page(request: Request):
@@ -162,11 +190,13 @@ async def do_login(request: Request):
     if stored_hash and bcrypt.checkpw(password.encode(), stored_hash.encode()):
         request.session["authed"] = True
         login_attempts.pop(ip, None)
+        logger.info(f"登录成功 | IP:{ip}")
         return {"success": True}
     else:
         count = login_attempts.get(ip, [0, None])[0] + 1
         lock_until = time.time() + 600 if count >= 5 else None
         login_attempts[ip] = [count, lock_until]
+        logger.warning(f"登录失败 | IP:{ip} | 累计:{count}次")
         return {"success": False, "msg": "密码错误"}
 
 @app.get("/logout")
@@ -203,6 +233,7 @@ async def write_knowledge(req: WriteRequest):
         ]
         collection.insert(data)
         collection.flush()
+        logger.info(f"写入: {req.content[:50]} | {req.category}")
         return {"status": "success", "message": "写入成功", "id": doc_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -227,6 +258,7 @@ async def search_knowledge(req: SearchRequest):
                     "similarity": round(hit.score * 100, 2),
                     "time": datetime.fromtimestamp(hit.entity.get("timestamp", 0) / 1000).strftime("%Y-%m-%d %H:%M")
                 })
+        logger.info(f"搜索: {req.query} | top_k:{req.top_k} | 结果:{len(items)}条")
         return {"results": items}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -239,9 +271,19 @@ async def stats_api():
 async def delete_knowledge(doc_id: str):
     try:
         collection.delete(expr=f'id == "{doc_id}"')
+        logger.warning(f"删除: {doc_id}")
         return {"status": "success", "message": "已删除"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/logs")
+async def view_logs(lines: int = 100):
+    log_file = os.path.join(LOG_DIR, "app.log")
+    if not os.path.exists(log_file):
+        return {"logs": []}
+    with open(log_file, "r", encoding="utf-8") as f:
+        all_lines = f.readlines()
+    return {"logs": all_lines[-lines:]}
 
 @app.get("/api/list")
 async def list_knowledge(limit: int = 50, offset: int = 0):
@@ -308,6 +350,7 @@ async def update_knowledge(doc_id: str, req: UpdateRequest):
         ]
         collection.insert(data)
         collection.flush()
+        logger.info(f"更新: {doc_id}")
         return {"message": "更新成功", "id": doc_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
