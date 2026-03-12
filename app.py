@@ -276,6 +276,10 @@ async def delete_knowledge(doc_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/logs", response_class=HTMLResponse)
+async def logs_page(request: Request):
+    return templates.TemplateResponse("logs.html", {"request": request})
+
 @app.get("/api/logs")
 async def view_logs(lines: int = 100):
     log_file = os.path.join(LOG_DIR, "app.log")
