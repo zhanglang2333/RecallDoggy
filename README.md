@@ -144,6 +144,12 @@ GET /api/export
 
 需登录，导出全部记忆为JSON。
 
+## 查看日志
+
+```
+GET /logs
+```
+
 ## 更新
 
 ```bash
