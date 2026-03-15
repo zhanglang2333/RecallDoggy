@@ -1,3 +1,4 @@
+import subprocess
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -774,6 +775,24 @@ async def mcp_weather(city: str = "天津") -> str:
         return f"天气获取失败: {e}"
 
 app.mount("/mcp", mcp_server.sse_app())
+
+
+@app.post("/api/update-system")
+async def update_system():
+    try:
+        result = subprocess.run(
+            ["bash", "/root/update.sh"],
+            capture_output=True, text=True, timeout=60
+        )
+        return {
+            "status": "success" if result.returncode == 0 else "error",
+            "output": result.stdout,
+            "error": result.stderr
+        }
+    except subprocess.TimeoutExpired:
+        return {"status": "error", "message": "update timeout 60s"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
     import sys
