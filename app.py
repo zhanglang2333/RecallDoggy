@@ -395,15 +395,39 @@ async def search_knowledge(req: SearchRequest):
 @app.get("/api/stats")
 async def stats_api():
     try:
-        all_data = collection.query(expr='id != ""', output_fields=["memory_level"], limit=16384)
+        all_data = collection.query(
+            expr='id != ""',
+            output_fields=["memory_level", "content", "category", "timestamp"],
+            limit=16384
+        )
         levels = {"flash": 0, "short": 0, "long": 0, "permanent": 0}
         for r in all_data:
             lv = r.get("memory_level", "flash")
             levels[lv] = levels.get(lv, 0) + 1
-        return {"total": collection.num_entities, "collection": COLLECTION_NAME, "levels": levels}
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        trend = {}
+        for i in range(6, -1, -1):
+            day = now - timedelta(days=i)
+            trend[day.strftime("%m-%d")] = 0
+        for r in all_data:
+            ts = r.get("timestamp", 0)
+            if ts:
+                dt = datetime.fromtimestamp(ts / 1000)
+                key = dt.strftime("%m-%d")
+                if key in trend:
+                    trend[key] += 1
+        sorted_data = sorted(all_data, key=lambda x: x.get("timestamp", 0), reverse=True)[:10]
+        recent = []
+        for r in sorted_data:
+            ts = r.get("timestamp", 0)
+            time_str = ""
+            if ts:
+                time_str = datetime.fromtimestamp(ts / 1000).strftime("%m-%d %H:%M")
+            recent.append({"category": r.get("category", ""), "content": r.get("content", "")[:80], "time": time_str})
+        return {"total": collection.num_entities, "collection": COLLECTION_NAME, "levels": levels, "trend": trend, "recent": recent}
     except Exception as e:
-        return {"total": collection.num_entities, "collection": COLLECTION_NAME, "levels": {}}
-
+        return {"total": collection.num_entities, "collection": COLLECTION_NAME, "levels": {}, "trend": {}, "recent": []}
 @app.delete("/api/delete/{doc_id}")
 async def delete_knowledge(doc_id: str):
     try:
