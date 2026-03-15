@@ -128,34 +128,6 @@ docker build -t recalldoggy .
 docker run -d -p 8001:8001 --env-file .env recalldoggy
 ```
 
-## 健康检查
-
-```
-GET /health
-```
-
-无需登录，返回服务状态。
-
-## 数据导出
-
-```
-GET /api/export
-```
-
-需登录，导出全部记忆为JSON。
-
-## 查看日志
-
-```
-GET /logs
-```
-
-## 更新
-
-```bash
-bash update.sh
-```
-
 # 🛠️ MCP 工具列表
 
 | 工具 | 功能 | 必填参数 | 可选参数 |
