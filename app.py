@@ -1,3 +1,4 @@
+from collections import deque
 import subprocess
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -257,11 +258,15 @@ async def login_page(request: Request):
 async def do_login(request: Request):
     data = await request.json()
     ip = request.client.host
-    if ip in login_attempts:
-        count, lock_until = login_attempts[ip]
-        if lock_until and time.time() < lock_until:
-            remaining = int((lock_until - time.time()) / 60) + 1
-            return {"success": False, "msg": f"尝试过多，{remaining}分钟后再试"}
+    now = time.time()
+    if ip not in login_attempts:
+        login_attempts[ip] = deque()
+    attempts = login_attempts[ip]
+    while attempts and now - attempts[0] > 600:
+        attempts.popleft()
+    if len(attempts) >= 5:
+        wait = int(600 - (now - attempts[0])) + 1
+        return {"success": False, "msg": f"尝试过多，{wait // 60 + 1}分钟后再试"}
     password = data.get("password", "")
     stored_hash = get_password_hash()
     if stored_hash and bcrypt.checkpw(password.encode(), stored_hash.encode()):
@@ -270,11 +275,12 @@ async def do_login(request: Request):
         logger.info(f"登录成功 | IP:{ip}")
         return {"success": True}
     else:
-        count = login_attempts.get(ip, [0, None])[0] + 1
-        lock_until = time.time() + 600 if count >= 5 else None
-        login_attempts[ip] = [count, lock_until]
-        logger.warning(f"登录失败 | IP:{ip} | 累计:{count}次")
-        return {"success": False, "msg": "密码错误"}
+        attempts.append(now)
+        left = 5 - len(attempts)
+        logger.warning(f"登录失败 | IP:{ip} | 窗口内:{len(attempts)}次")
+        if left > 0:
+            return {"success": False, "msg": f"密码错误，还剩{left}次"}
+        return {"success": False, "msg": "尝试过多，10分钟后再试"}
 
 @app.get("/logout")
 async def logout(request: Request):
