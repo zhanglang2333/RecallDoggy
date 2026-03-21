@@ -1,13 +1,14 @@
 # 🐕 RecallDoggy
 
-一个基于 Zilliz Cloud 向量数据库的 MCP 知识库服务，支持 SSE 和 stdio 双传输模式。
+一个基于 Zilliz Cloud 向量数据库的 MCP 知识库服务，支持 SSE / Streamable HTTP / stdio 三种传输模式。
 
 ## ✨ 功能特性
 
 - 📝 **记忆管理** - 写入 / 语义搜索 / 列表 / 编辑 / 删除
 - 🎉 **纪念日管理** - 添加 / 查询 / 删除纪念日
 - 📅 **时间感知** - mcp_today 工具，支持农历、节气、节日、纪念日查询
-- 🌐 **双传输模式** - SSE（远程部署）+ stdio（本地直连）
+- 🌐 **三传输模式** - SSE + Streamable HTTP（远程部署）+ stdio（本地直连）
+- 🔐 **Bearer Token 认证** - 保护远程 MCP 端点
 - 🐳 **Docker 支持** - 一键容器化部署
 - 🖥️ **前端页面** - 可视化管理知识库
 - 🧠 **分层记忆** - flash/short/long/permanent 四级记忆 + 艾宾浩斯衰减
@@ -49,6 +50,7 @@ pip install -r requirements.txt
 ZILLIZ_URI=你的Zilliz Cloud地址
 ZILLIZ_TOKEN=你的Zilliz Cloud Token
 HEFENG_API_KEY=你的和风天气API Key（可选）
+MCP_AUTH_TOKEN=你的MCP认证Token（用于远程端点鉴权）
 ```
 
 > SQLite 数据库（metadata.db）运行时自动创建，无需配置。
@@ -61,7 +63,12 @@ HEFENG_API_KEY=你的和风天气API Key（可选）
 python app.py
 ```
 
-服务启动在 `http://0.0.0.0:8001`，MCP 端点为 `/sse`
+服务启动在 `http://0.0.0.0:8001`
+
+| 端点 | 传输模式 |
+|------|---------|
+| `/sse` | SSE |
+| `/mcp-http/mcp` | Streamable HTTP |
 
 **stdio 模式（本地直连）：**
 
@@ -69,17 +76,43 @@ python app.py
 python app.py --stdio
 ```
 
+## 🔐 认证
+
+远程端点（SSE / Streamable HTTP）需要在请求头中携带 Bearer Token：
+
+```
+Authorization: Bearer <你的MCP_AUTH_TOKEN>
+```
+
+stdio 模式不需要认证。
+
 ## 🔧 MCP 客户端配置
 
-### SSE 模式
-
-在 MCP 客户端中添加：
+### Streamable HTTP 模式（推荐）
 
 ```json
 {
   "mcpServers": {
     "RecallDoggy": {
-      "url": "http://你的服务器IP:8001/sse"
+      "url": "https://你的域名/mcp-http/mcp",
+      "headers": {
+        "Authorization": "Bearer 你的token"
+      }
+    }
+  }
+}
+```
+
+### SSE 模式
+
+```json
+{
+  "mcpServers": {
+    "RecallDoggy": {
+      "url": "https://你的域名/sse",
+      "headers": {
+        "Authorization": "Bearer 你的token"
+      }
     }
   }
 }
@@ -128,7 +161,7 @@ docker build -t recalldoggy .
 docker run -d -p 8001:8001 --env-file .env recalldoggy
 ```
 
-# 🛠️ MCP 工具列表
+## 🛠️ MCP 工具列表
 
 | 工具 | 功能 | 必填参数 | 可选参数 |
 |------|------|----------|----------|
