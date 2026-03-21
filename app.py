@@ -19,6 +19,7 @@ import math
 import bcrypt
 import urllib.request
 from urllib.parse import quote
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 load_dotenv()
 from typing import List, Optional
@@ -123,7 +124,16 @@ class UTF8JSONResponse(JSONResponse):
     def render(self, content):
         return json.dumps(content, ensure_ascii=False).encode("utf-8")
 
-app = FastAPI(default_response_class=UTF8JSONResponse)
+mcp_server = FastMCP("RecallDoggy", transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False))
+mcp_http_app = mcp_server.streamable_http_app()
+
+@asynccontextmanager
+async def combined_lifespan(application):
+    async with mcp_http_app.router.lifespan_context(application):
+        await _startup()
+        yield
+
+app = FastAPI(default_response_class=UTF8JSONResponse, lifespan=combined_lifespan)
 app.add_middleware(AuthMiddleware)
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("SESSION_SECRET", "recalldoggy-default-secret-change-me"), max_age=60*60*24*7)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -149,8 +159,7 @@ class UpdateRequest(BaseModel):
 class CleanupRequest(BaseModel):
     threshold: float = 0.05
 
-@app.on_event("startup")
-async def startup():
+async def _startup():
     global encoder, collection
     logger.info("启动服务...")
     connections.connect(alias="default", uri=ZILLIZ_URI, token=ZILLIZ_TOKEN)
@@ -653,7 +662,6 @@ async def dashboard_data():
         raise HTTPException(status_code=500, detail=str(e))
 
 # === MCP ===
-mcp_server = FastMCP("RecallDoggy", transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False))
 
 @mcp_server.tool()
 async def mcp_search(query: str, top_k: int = 5) -> str:
@@ -781,6 +789,7 @@ async def mcp_weather(city: str = "天津") -> str:
         return f"天气获取失败: {e}"
 
 app.mount("/mcp", mcp_server.sse_app())
+app.mount("/mcp-http", mcp_http_app)
 
 
 @app.post("/api/update-system")
