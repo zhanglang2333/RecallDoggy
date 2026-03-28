@@ -5,19 +5,31 @@ description: >
   包括写入知识、语义搜索、列表、编辑、删除、查看统计、
   查询今日日期/农历/节气/纪念日、天气查询。
   支持分层记忆系统（flash/short/long/permanent），
-  基于艾宾浩斯遗忘曲线自动衰减与巩固。通过MCP工具操作。
+  基于艾宾浩斯遗忘曲线自动衰减与巩固。
+  支持多用户记忆隔离（user字段）。通过MCP工具操作。
 ---
 
 # RecallDoggy 向量知识库
 
-基于 FastAPI + Zilliz Cloud(Milvus) + SentenceTransformer + SQLite 的分层记忆知识库服务。
+基于 FastAPI + Zilliz Cloud(Milvus) + SentenceTransformer 的分层记忆知识库服务。
 
 ## 架构
 
-- **向量搜索**: Zilliz Cloud (Milvus) — 存储内容与嵌入向量
-- **元数据管理**: SQLite — 存储记忆层级、召回次数、衰减状态
+- **代码拆分**: memory.py（纯计算）+ store.py（MemoryStore 抽象基类 + ZillizMemoryStore）+ app.py（路由 + 中间件 + MCP）
+- **向量搜索**: Zilliz Cloud (Milvus) — 存储内容、嵌入向量、记忆层级、召回次数、衰减状态、用户标识
 - **嵌入模型**: paraphrase-multilingual-MiniLM-L12-v2（本地，支持中文）
 - **前端**: Jinja2 模板，主题色 #A0D8EF
+- **认证**: bcrypt + session + AuthMiddleware，登录限流（滑动窗口）
+
+## 多用户记忆隔离
+
+Zilliz schema 包含 `user` 字段（VARCHAR 64），所有写入/搜索/统计/导出自动按 user 过滤。
+
+| user 值 | 用途 |
+|---------|------|
+| default | 旧数据迁移默认值 |
+| claude | Claude 的记忆 |
+| 4o | GPT-4o 的记忆 |
 
 ## 分层记忆系统
 
@@ -44,7 +56,7 @@ description: >
 
 ### 自动升级
 
-每次被搜索命中：recall_count += 1，刷新 last_recall_time，自动升级层级。
+每次被搜索命中：recall_count += 1，刷新 last_recall，自动升级层级。
 
 ### permanent 特殊逻辑
 
@@ -54,17 +66,20 @@ description: >
 
 ## MCP 连接方式
 
-- SSE: http://YOUR_SERVER_IP:8000/mcp/sse
-- stdio: python app.py --stdio
+| 传输模式 | 端点 | 认证 |
+|---------|------|------|
+| SSE | /mcp/sse | Bearer Token |
+| Streamable HTTP | /mcp-http/mcp | Bearer Token |
+| stdio | python app.py --stdio | 无需认证 |
 
 ## MCP 工具列表
 
 | 工具 | 功能 | 必填参数 | 可选参数 |
 |------|------|----------|----------|
-| mcp_write | 写入知识 | content(string) | category(string), tags(string,逗号分隔) |
-| mcp_search | 语义搜索（含permanent置顶） | query(string) | top_k(int, 默认5) |
+| mcp_write | 写入知识 | content(string) | category(string), tags(string,逗号分隔), memory_level(string), user(string) |
+| mcp_search | 语义搜索（含permanent置顶） | query(string) | top_k(int, 默认5), user(string) |
 | mcp_delete | 删除条目 | doc_id(string) | - |
-| mcp_stats | 知识库统计（含各层级数量） | - | - |
+| mcp_stats | 知识库统计（含各层级数量） | - | user(string) |
 | mcp_today | 今日日期/农历/节气/节日/纪念日 | - | - |
 | mcp_weather | 查询城市天气 | - | city(string, 默认天津) |
 
@@ -83,6 +98,13 @@ description: >
 | GET | /api/weather | 天气查询 |
 | POST | /api/set_level/{id}?level=xxx | 手动设置记忆层级 |
 | POST | /api/cleanup | 按阈值清理衰减记忆 |
+| GET | /health | 健康检查 |
+| GET | /api/export | 导出全部记忆 |
+| GET | /dashboard | Dashboard 页面 |
+| GET | /logs | 日志页面 |
+| GET | /api/logs | 日志 API |
+| GET | /api/dashboard | Dashboard 数据 API |
+| POST | /api/update-system | 一键更新（执行 update.sh） |
 
 ## 使用场景
 
@@ -101,14 +123,14 @@ description: >
 
 ## 写入行为
 
-- 自动追加时间标签到 tags（格式：YYYY-MM-DD HH:MM）
 - 内容去重：相同内容不会重复写入（MD5校验）
 - 默认层级 flash，可指定 memory_level
+- 默认 user 为 "default"，可指定 user 隔离记忆
 
 ## 注意事项
 
 - 服务器UTC时区，代码内转北京时间(UTC+8)
-- 搜索时取 top_k*2 条候选，加权排序后截取 top_k
+- 搜索时 permanent 先单独查出置顶，剩余走向量搜索加权排序
 - permanent 记忆始终返回，不受 top_k 限制
-- SQLite 文件: /root/metadata.db（运行时自动创建）
 - 清理功能不会删除 permanent 记忆
+- 旧数据（无 user 字段）启动时自动迁移为 user="default"
