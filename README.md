@@ -5,14 +5,24 @@
 ## ✨ 功能特性
 
 - 📝 **记忆管理** - 写入 / 语义搜索 / 列表 / 编辑 / 删除
+- 🧠 **分层记忆** - flash/short/long/permanent 四级记忆 + 艾宾浩斯衰减
+- 👥 **多用户隔离** - user 字段隔离不同 AI 的记忆（Claude / GPT-4o）
 - 🎉 **纪念日管理** - 添加 / 查询 / 删除纪念日
 - 📅 **时间感知** - mcp_today 工具，支持农历、节气、节日、纪念日查询
-- 🌐 **三传输模式** - SSE + Streamable HTTP（远程部署）+ stdio（本地直连）
-- 🔐 **Bearer Token 认证** - 保护远程 MCP 端点
-- 🐳 **Docker 支持** - 一键容器化部署
-- 🖥️ **前端页面** - 可视化管理知识库
-- 🧠 **分层记忆** - flash/short/long/permanent 四级记忆 + 艾宾浩斯衰减
 - 🌤️ **天气查询** - mcp_weather 工具
+- 🌐 **三传输模式** - SSE + Streamable HTTP（远程部署）+ stdio（本地直连）
+- 🔐 **双重认证** - 登录认证（bcrypt + session）+ MCP Bearer Token
+- 🛡️ **登录限流** - 滑动窗口限流，防暴力破解
+- 🖥️ **前端页面** - 可视化管理 + Dashboard + 日志查看
+- 🐳 **Docker 支持** - 一键容器化部署
+
+## 🏗️ 架构
+
+```
+memory.py   — 纯计算（衰减公式、层级升级、格式化）
+store.py    — 数据库抽象层（MemoryStore 基类 + ZillizMemoryStore 实现）
+app.py      — 路由 + 中间件 + MCP 工具
+```
 
 ## 🧠 分层记忆系统
 
@@ -26,6 +36,18 @@
 - 衰减公式：`R = e^(-t/S)`（t=小时数，S=强度系数）
 - 搜索加权：`final_score = similarity × 0.7 + retention × 0.3`
 - permanent 记忆不管搜什么都会返回，不占 top_k 名额
+
+## 👥 多用户隔离
+
+Zilliz schema 包含 `user` 字段，写入/搜索/统计/导出全部按 user 自动过滤：
+
+```
+user="claude"  → Claude 的记忆
+user="4o"      → GPT-4o 的记忆
+user="default" → 旧数据迁移默认值
+```
+
+启动时自动检测旧 schema（无 user 字段）→ 导出 → 重建 → 回填 user="default"。
 
 ## 🚀 快速开始
 
@@ -49,11 +71,9 @@ pip install -r requirements.txt
 ```env
 ZILLIZ_URI=你的Zilliz Cloud地址
 ZILLIZ_TOKEN=你的Zilliz Cloud Token
-HEFENG_API_KEY=你的和风天气API Key（可选）
-MCP_AUTH_TOKEN=你的MCP认证Token（用于远程端点鉴权）
+MCP_TOKEN=你的MCP认证Token（用于远程端点鉴权）
+SESSION_SECRET=你的session密钥（可选，有默认值）
 ```
-
-> SQLite 数据库（metadata.db）运行时自动创建，无需配置。
 
 ### 4. 启动服务
 
@@ -67,7 +87,7 @@ python app.py
 
 | 端点 | 传输模式 |
 |------|---------|
-| `/sse` | SSE |
+| `/mcp/sse` | SSE |
 | `/mcp-http/mcp` | Streamable HTTP |
 
 **stdio 模式（本地直连）：**
@@ -78,10 +98,14 @@ python app.py --stdio
 
 ## 🔐 认证
 
-远程端点（SSE / Streamable HTTP）需要在请求头中携带 Bearer Token：
+### 网页登录
+首次访问 `/setup` 设置密码，之后通过 `/login` 登录。滑动窗口限流：600秒内5次失败锁定。
+
+### MCP 远程端点
+SSE / Streamable HTTP 需要在请求头中携带 Bearer Token：
 
 ```
-Authorization: Bearer <你的MCP_AUTH_TOKEN>
+Authorization: Bearer <你的MCP_TOKEN>
 ```
 
 stdio 模式不需要认证。
@@ -109,7 +133,7 @@ stdio 模式不需要认证。
 {
   "mcpServers": {
     "RecallDoggy": {
-      "url": "https://你的域名/sse",
+      "url": "https://你的域名/mcp/sse",
       "headers": {
         "Authorization": "Bearer 你的token"
       }
@@ -165,10 +189,10 @@ docker run -d -p 8001:8001 --env-file .env recalldoggy
 
 | 工具 | 功能 | 必填参数 | 可选参数 |
 |------|------|----------|----------|
-| `mcp_write` | 写入记忆 | content | category, tags |
-| `mcp_search` | 语义搜索（含 permanent 置顶） | query | top_k（默认5） |
+| `mcp_write` | 写入记忆 | content | category, tags, memory_level, user |
+| `mcp_search` | 语义搜索（含 permanent 置顶） | query | top_k（默认5）, user |
 | `mcp_delete` | 删除记忆 | doc_id | - |
-| `mcp_stats` | 知识库统计（含各层级数量） | - | - |
+| `mcp_stats` | 知识库统计（含各层级数量） | - | user |
 | `mcp_today` | 今日信息（农历/节气/节日/纪念日） | - | - |
 | `mcp_weather` | 天气查询 | - | city（默认天津） |
 
