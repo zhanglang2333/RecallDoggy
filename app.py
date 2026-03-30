@@ -407,14 +407,37 @@ async def api_today():
 # === MCP工具 ===
 @mcp_server.tool()
 async def mcp_search(query: str, top_k: int = 5) -> str:
-    """搜索记忆库。返回语义最相似的结果+permanent置顶记忆。"""
+    """在记忆库中语义搜索。
+
+    query: 提取核心关键词或短语搜索，不要把用户的完整对话原文丢进来。
+      好的query: "RecallDoggy部署端口" "小墨生日" "牙套品牌"
+      差的query: "你之前有没有记过我的生日是哪天来着"
+    top_k: 返回条数，默认5。
+    返回: permanent置顶记忆(不占top_k) + 按 similarity*0.7+retention*0.3 加权排序的结果。
+    每条结果含 id/content/category/tags/similarity/memory_level/retention/recall_count。
+    """
     query_vec = encoder.encode(query).tolist()
     result = await store.search(query_vec, top_k)
     return json.dumps(result, ensure_ascii=False)
 
 @mcp_server.tool()
 async def mcp_write(content: str, category: str = "通用", tags: str = "", memory_level: str = "flash") -> str:
-    """向记忆库写入。memory_level可选flash/short/long/permanent，纪念日自动permanent。"""
+    """向记忆库写入一条记忆。
+
+    content: 记忆正文。写完整清晰的陈述句，避免模糊指代。
+    category: 分类，仅限以下值：通用 / 技术 / 生活 / 学习 / 纪念日 / 人物 / 项目。
+      不要自创分类。category设为纪念日时自动升为permanent。
+    tags: 逗号分隔的字符串，如 "Python,FastAPI,部署"。
+      纪念日必须包含日期加类型标签，如 "08-13,solar" 或 "六月廿三,lunar"。
+      不要传JSON数组，只接受逗号分隔纯文本。
+    memory_level: 记忆层级:
+      flash: 临时信息（默认，24h半衰期，没人搜就衰减消失）
+      short: 近期有用（7天半衰期）
+      long: 重要但非核心（30天半衰期）
+      permanent: 绝不能忘的核心信息（永不衰减）
+      拿不准就用flash，系统会根据召回次数自动升级。
+    返回写入结果含id。相同内容MD5去重不会重复写入。
+    """
     embedding = encoder.encode(content).tolist()
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
     level = memory_level
@@ -425,19 +448,22 @@ async def mcp_write(content: str, category: str = "通用", tags: str = "", memo
 
 @mcp_server.tool()
 async def mcp_delete(doc_id: str) -> str:
-    """删除指定ID的记忆"""
+    """删除一条记忆。
+
+    doc_id: 记忆ID，从 mcp_search 返回结果的 id 字段获取。不要猜测或编造ID。
+    """
     await store.delete(doc_id)
     return f"已删除 {doc_id}"
 
 @mcp_server.tool()
 async def mcp_stats() -> str:
-    """查看记忆库统计，含各层级数量"""
+    """查看记忆库统计：总数加各层级(flash/short/long/permanent)分布数量。"""
     result = await store.stats()
     return json.dumps(result, ensure_ascii=False)
 
 @mcp_server.tool()
 async def mcp_today() -> str:
-    """获取今天的完整日期信息（公历/农历/节气/节日/纪念日）"""
+    """获取今天的日期信息：公历、农历、干支、生肖、节气、节日、自定义纪念日。无需任何参数。"""
     now = datetime.now(TZ_CN).replace(tzinfo=None)
     a = cnlunar.Lunar(now, godType='8char')
     lunar_date = f"{a.lunarMonthCn}{a.lunarDayCn}"
@@ -477,8 +503,12 @@ async def mcp_today() -> str:
     return "\n".join(lines_out)
 
 @mcp_server.tool()
-async def mcp_weather(city: str = "天津") -> str:
-    """查询城市天气。默认天津。返回温度、体感、湿度、风向、描述等。"""
+async def mcp_weather(city: str) -> str:
+    """查询指定城市实时天气。
+
+    city: 城市名（必填）。不要假设默认城市，不确定就问用户。
+    返回: 温度、体感温度、湿度、天气描述、今日温度范围。
+    """
     try:
         url = f"https://wttr.in/{quote(city)}?format=j1&lang=zh&m"
         req = urllib.request.Request(url, headers={"User-Agent": "RecallDoggy/1.5"})

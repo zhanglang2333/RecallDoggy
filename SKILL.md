@@ -76,12 +76,12 @@ Zilliz schema 包含 `user` 字段（VARCHAR 64），所有写入/搜索/统计/
 
 | 工具 | 功能 | 必填参数 | 可选参数 |
 |------|------|----------|----------|
-| mcp_write | 写入知识 | content(string) | category(string), tags(string,逗号分隔), memory_level(string), user(string) |
-| mcp_search | 语义搜索（含permanent置顶） | query(string) | top_k(int, 默认5), user(string) |
-| mcp_delete | 删除条目 | doc_id(string) | - |
+| mcp_write | 写入知识 | content(string) | category(string, 仅限：通用/技术/生活/学习/纪念日/人物/项目), tags(string,逗号分隔纯文本), memory_level(string, flash/short/long/permanent), user(string) |
+| mcp_search | 语义搜索（含permanent置顶） | query(string, 提取核心关键词，不要丢完整对话原文) | top_k(int, 默认5), user(string) |
+| mcp_delete | 删除条目 | doc_id(string, 从搜索结果id字段获取，不要编造) | - |
 | mcp_stats | 知识库统计（含各层级数量） | - | user(string) |
 | mcp_today | 今日日期/农历/节气/节日/纪念日 | - | - |
-| mcp_weather | 查询城市天气 | - | city(string, 默认天津) |
+| mcp_weather | 查询城市天气 | city(string, 必填，不要假设默认城市) | - |
 
 ## REST API 端点
 
@@ -109,16 +109,16 @@ Zilliz schema 包含 `user` 字段（VARCHAR 64），所有写入/搜索/统计/
 ## 使用场景
 
 - 记一下xxx / 记住xxx -> mcp_write
-- 有没有关于xxx / 搜索 -> mcp_search
+- 有没有关于xxx / 搜索 -> mcp_search（提取关键词搜索，不要丢整句话）
 - 今天什么日子 -> mcp_today
-- 天气怎么样 -> mcp_weather
-- 删掉那条 -> mcp_delete
+- xx城市天气怎么样 -> mcp_weather（必须指定城市，不知道就问用户）
+- 删掉那条 -> mcp_delete（先搜索拿到id再删）
 - 知识库多少条了 -> mcp_stats
 
 ## 纪念日
 
 - 写入时 category 设为「纪念日」，自动标记为 permanent
-- tags 包含日期（如 02-14）和类型（solar/lunar）
+- tags 包含日期（如 02-14）和类型（solar/lunar），用逗号分隔纯文本
 - mcp_today 会自动匹配当日纪念日并返回
 
 ## 写入行为
@@ -126,6 +126,7 @@ Zilliz schema 包含 `user` 字段（VARCHAR 64），所有写入/搜索/统计/
 - 内容去重：相同内容不会重复写入（MD5校验）
 - 默认层级 flash，可指定 memory_level
 - 默认 user 为 "default"，可指定 user 隔离记忆
+- category 只接受固定值：通用/技术/生活/学习/纪念日/人物/项目
 
 ## 注意事项
 
@@ -134,3 +135,4 @@ Zilliz schema 包含 `user` 字段（VARCHAR 64），所有写入/搜索/统计/
 - permanent 记忆始终返回，不受 top_k 限制
 - 清理功能不会删除 permanent 记忆
 - 旧数据（无 user 字段）启动时自动迁移为 user="default"
+- tags 只接受逗号分隔纯文本，不要传 JSON 数组
