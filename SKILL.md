@@ -49,6 +49,8 @@ Zilliz schema 包含 `user` 字段（VARCHAR 64），所有写入/搜索/统计/
 - t = 距上次recall的小时数
 - S = 强度系数（flash=24, short=168, long=720, permanent=inf）
 - R = 保留率 (0~1)
+- recall_count=0时按1计算（不影响新记忆）
+- 被召回越多衰减越慢，上限cap在1.0
 
 ### 搜索加权
 
