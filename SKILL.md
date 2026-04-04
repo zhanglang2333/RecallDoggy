@@ -44,7 +44,7 @@ Zilliz schema 包含 `user` 字段（VARCHAR 64），所有写入/搜索/统计/
 
 ### 衰减公式（艾宾浩斯）
 
-    R = e^(-t / S)
+    R = min(1.0, e^(-t / S) × recall_count^0.3)
 
 - t = 距上次recall的小时数
 - S = 强度系数（flash=24, short=168, long=720, permanent=inf）
