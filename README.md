@@ -194,9 +194,7 @@ docker run -d -p 8001:8001 --env-file .env recalldoggy
 | `mcp_delete` | 删除记忆 | doc_id | - |
 | `mcp_stats` | 知识库统计（含各层级数量） | - | user |
 | `mcp_today` | 今日信息（农历/节气/节日/纪念日） | - | - |
-| `mcp_weather` | 天气查询 | - | city（默认天津） |
-
-（因为我是天津人所以默认的天津(￣^￣)ゞ）
+| `mcp_weather` | 天气查询 | - | city（必填！！！）
 
 ## 📋 环境要求
 
