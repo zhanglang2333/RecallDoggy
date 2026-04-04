@@ -231,7 +231,8 @@ class ZillizMemoryStore(MemoryStore):
                     continue
                 level = hit.entity.get("memory_level", "flash")
                 lr = hit.entity.get("last_recall", hit.entity.get("timestamp", 0))
-                ret = calc_retention(level, lr)
+                rc = hit.entity.get("recall_count", 0)
+                ret = calc_retention(level, lr, rc)
                 sim = hit.score
                 scored.append({
                     "hit": hit,
@@ -364,7 +365,8 @@ class ZillizMemoryStore(MemoryStore):
             r["id"] for r in all_data
             if calc_retention(
                 r.get("memory_level", "flash"),
-                r.get("last_recall", r.get("timestamp", 0))
+                r.get("last_recall", r.get("timestamp", 0)),
+                r.get("recall_count", 0)
             ) < threshold
         ]
         for doc_id in to_delete:

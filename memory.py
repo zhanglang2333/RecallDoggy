@@ -13,12 +13,12 @@ def now_ms():
     return int(datetime.now(TZ_CN).timestamp() * 1000)
 
 
-def calc_retention(memory_level, last_recall_ts):
+def calc_retention(memory_level, last_recall_ts, recall_count=0):
     if memory_level == "permanent":
         return 1.0
     S = HALF_LIFE.get(memory_level, 24)
     t_hours = max(0, (now_ms() - last_recall_ts) / 3600000)
-    return math.exp(-t_hours / S)
+    return min(1.0, math.exp(-t_hours / S) * (max(1, recall_count) ** 0.3))
 
 
 def check_upgrade(memory_level, recall_count):
@@ -37,7 +37,7 @@ def format_item(r, similarity=None):
     level = r.get("memory_level", "flash")
     rc = r.get("recall_count", 0)
     lr = r.get("last_recall", ts)
-    ret = calc_retention(level, lr)
+    ret = calc_retention(level, lr, rc)
     item = {
         "id": r.get("id"),
         "content": r.get("content"),
