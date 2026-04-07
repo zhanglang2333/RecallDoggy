@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>插件管理 - RecallDoggy</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,sans-serif;background:#f0f8ff;color:#333;padding:20px;max-width:800px;margin:0 auto}
+h1{color:#4a9ebe;margin-bottom:20px}
+.nav a{color:#4a9ebe;text-decoration:none;margin-right:16px;font-size:14px}
+.box{background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.row{display:flex;gap:10px}
+.row input{flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px}
+.btn{padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-size:13px;color:#fff}
+.bp{background:#A0D8EF}.bd{background:#ff6b6b}.be{background:#51cf66}.bg{background:#adb5bd}
+.card{background:#fff;border-radius:12px;padding:14px 18px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,.08);display:flex;justify-content:space-between;align-items:center}
+.card h3{font-size:15px}.card h3 span{font-size:12px;color:#999;margin-left:8px;font-weight:normal}
+.card p{font-size:13px;color:#777;margin-top:2px}
+.acts{display:flex;gap:8px}
+.empty{text-align:center;color:#999;padding:40px}
+.hint{font-size:12px;color:#999;margin-top:8px}
+.msg{padding:10px;border-radius:8px;margin-bottom:12px;font-size:13px;display:none}
+.ok{background:#d3f9d8;color:#2b8a3e}.er{background:#ffe3e3;color:#c92a2a}
+</style>
+</head>
+<body>
+<div class="nav"><a href="/">首页</a><a href="/dashboard">仪表盘</a><a href="/plugins">插件</a><a href="/logs">日志</a></div>
+<h1>🧩 插件管理</h1>
+<div id="msg" class="msg"></div>
+<div class="box">
+<h2 style="font-size:16px;margin-bottom:10px;color:#555">安装插件</h2>
+<div class="row">
+<input type="text" id="url" placeholder="GitHub仓库地址">
+<button class="btn bp" onclick="inst()">安装</button>
+</div>
+<p class="hint">⚠️ 安装/卸载/切换后需重启服务生效</p>
+</div>
+<div id="list"></div>
+<script>
+function msg(t,o){const e=document.getElementById('msg');e.textContent=t;e.className='msg '+(o?'ok':'er');e.style.display='block';setTimeout(()=>e.style.display='none',4000)}
+async function load(){const r=await fetch('/api/plugins');const d=await r.json();const el=document.getElementById('list');if(!d.length){el.innerHTML='<div class="empty">还没有安装任何插件 🐕</div>';return}
+el.innerHTML=d.map(p=>'<div class="card"><div><h3>'+p.name+'<span>v'+p.version+'</span></h3><p>'+(p.description||'无描述')+'</p></div><div class="acts"><button class="btn '+(p.enabled?'be':'bg')+'" onclick="tog(\''+p.name+'\')">'+(p.enabled?'已启用':'已禁用')+'</button><button class="btn bd" onclick="del(\''+p.name+'\')">卸载</button></div></div>').join('')}
+async function inst(){const u=document.getElementById('url').value.trim();if(!u)return;const r=await fetch('/api/plugins/install',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:u})});const d=await r.json();if(r.ok&&d.ok){msg('安装成功',1);document.getElementById('url').value='';load()}else msg(d.detail||'失败',0)}
+async function tog(n){const r=await fetch('/api/plugins/'+n+'/toggle',{method:'POST'});const d=await r.json();if(r.ok&&d.ok){msg(n+(d.enabled?' 已启用':' 已禁用'),1);load()}else msg(d.detail||'失败',0)}
+async function del(n){if(!confirm('确定卸载 '+n+'？'))return;const r=await fetch('/api/plugins/'+n,{method:'DELETE'});const d=await r.json();if(r.ok&&d.ok){msg('已卸载',1);load()}else msg(d.detail||'失败',0)}
+load()
+</script>
+</body>
+</html>

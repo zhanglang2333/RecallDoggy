@@ -28,6 +28,7 @@ from logging.handlers import RotatingFileHandler
 
 from memory import TZ_CN, LEVEL_ORDER
 from store import ZillizMemoryStore
+from loader import PluginLoader
 
 # === 日志 ===
 LOG_DIR = os.path.join(os.path.dirname(__file__), "logs")
@@ -45,6 +46,7 @@ AUTH_FILE = os.path.join(os.path.dirname(__file__), ".auth")
 
 encoder = None
 store = None
+plugin_loader = None
 login_attempts = {}
 
 def get_password_hash():
@@ -98,7 +100,7 @@ mcp_server = FastMCP("RecallDoggy", transport_security=TransportSecuritySettings
 mcp_http_app = mcp_server.streamable_http_app()
 
 async def _startup():
-    global encoder, store
+    global encoder, store, plugin_loader
     logger.info("启动服务...")
     store = ZillizMemoryStore(
         uri=os.getenv("ZILLIZ_URI"),
@@ -107,6 +109,9 @@ async def _startup():
     await store.connect()
     encoder = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
     logger.info("模型加载成功")
+    plugin_loader = PluginLoader()
+    plugin_loader.load_all(app, mcp_server)
+    logger.info(f"已加载 {len(plugin_loader.plugins)} 个插件")
 
 @asynccontextmanager
 async def combined_lifespan(application):
@@ -524,6 +529,44 @@ async def mcp_weather(city: str) -> str:
         return result
     except Exception as e:
         return f"天气获取失败: {e}"
+
+
+# === 插件管理API ===
+@app.get("/plugins", response_class=HTMLResponse)
+async def plugins_page(request: Request):
+    return templates.TemplateResponse("plugins.html", {"request": request})
+
+@app.get("/api/plugins")
+async def api_plugins():
+    return plugin_loader.list_plugins()
+
+@app.post("/api/plugins/install")
+async def api_plugin_install(request: Request):
+    body = await request.json()
+    url = body.get("url", "")
+    if not url:
+        raise HTTPException(status_code=400, detail="缺少url")
+    try:
+        meta = plugin_loader.install(url)
+        return {"ok": True, "plugin": meta}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/plugins/{name}")
+async def api_plugin_uninstall(name: str):
+    try:
+        plugin_loader.uninstall(name)
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/plugins/{name}/toggle")
+async def api_plugin_toggle(name: str):
+    try:
+        enabled = plugin_loader.toggle(name)
+        return {"ok": True, "enabled": enabled}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 app.mount("/mcp", mcp_server.sse_app())
 app.mount("/mcp-http", mcp_http_app)
