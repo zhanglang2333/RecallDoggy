@@ -1,0 +1,10 @@
+services:
+  recalldoggy:
+    build: .
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env
+    environment:
+      - HF_ENDPOINT=https://hf-mirror.com
+    restart: unless-stopped

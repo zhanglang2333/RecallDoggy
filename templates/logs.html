@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📋 RecallDoggy 日志</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; background: #1a1a2e; color: #e0e0e0; min-height: 100vh; padding: 15px; }
+        .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
+        .header h1 { font-size: 1.4em; color: #A0D8EF; }
+        .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .controls input, .controls select { padding: 6px 10px; border: 1px solid #333; border-radius: 6px; background: #16213e; color: #e0e0e0; font-size: 13px; }
+        .controls input[type="text"] { width: 160px; }
+        .controls button { padding: 6px 14px; border: none; border-radius: 6px; background: #A0D8EF; color: #1a1a2e; font-weight: 600; font-size: 13px; cursor: pointer; }
+        .controls button:hover { background: #7CC2DE; }
+        .controls button.danger { background: #ff6b6b; color: white; }
+        .log-container { background: #16213e; border-radius: 10px; padding: 12px; overflow-x: auto; }
+        .log-line { padding: 4px 8px; border-radius: 4px; margin-bottom: 2px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
+        .log-line:hover { background: rgba(160, 216, 239, 0.1); }
+        .log-line.info { border-left: 3px solid #A0D8EF; }
+        .log-line.warning { border-left: 3px solid #ffa502; color: #ffa502; }
+        .log-line.error { border-left: 3px solid #ff6b6b; color: #ff6b6b; }
+        .stats { font-size: 12px; color: #666; margin-top: 10px; text-align: right; }
+        .empty { text-align: center; color: #666; padding: 40px; }
+        .back-link { color: #A0D8EF; text-decoration: none; font-size: 13px; }
+        .auto-badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #2ed573; color: #1a1a2e; }
+        .auto-badge.off { background: #555; color: #999; }
+        @media (max-width: 768px) { .controls input[type="text"] { width: 120px; } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>📋 日志</h1>
+            <a href="/" class="back-link">← 返回知识库</a>
+        </div>
+        <div class="controls">
+            <input type="text" id="filter" placeholder="搜索过滤..." oninput="renderLogs()">
+            <select id="levelFilter" onchange="renderLogs()">
+                <option value="all">全部</option>
+                <option value="info">INFO</option>
+                <option value="warning">WARNING</option>
+                <option value="error">ERROR</option>
+            </select>
+            <input type="number" id="lines" value="100" min="10" max="1000" step="50" style="width:70px;">
+            <button onclick="loadLogs()">刷新</button>
+            <button onclick="toggleAuto()" id="autoBtn">自动 <span id="autoBadge" class="auto-badge off">关</span></button>
+        </div>
+    </div>
+    <div class="log-container" id="logContainer">
+        <div class="empty">加载中...</div>
+    </div>
+    <div class="stats" id="stats"></div>
+
+    <script>
+        let allLogs = [];
+        let autoTimer = null;
+
+        async function loadLogs() {
+            const lines = document.getElementById('lines').value;
+            try {
+                const res = await fetch('/api/logs?lines=' + lines);
+                const data = await res.json();
+                allLogs = data.logs || [];
+                renderLogs();
+            } catch(e) {
+                document.getElementById('logContainer').innerHTML = '<div class="empty">加载失败</div>';
+            }
+        }
+
+        function renderLogs() {
+            const filter = document.getElementById('filter').value.toLowerCase();
+            const levelFilter = document.getElementById('levelFilter').value;
+            const container = document.getElementById('logContainer');
+
+            let filtered = allLogs.filter(line => {
+                if (filter && !line.toLowerCase().includes(filter)) return false;
+                if (levelFilter !== 'all') {
+                    if (!line.toLowerCase().includes('| ' + levelFilter + ' |') && !line.toLowerCase().includes('| ' + levelFilter.toUpperCase() + ' |')) return false;
+                }
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="empty">没有匹配的日志</div>';
+                document.getElementById('stats').textContent = '';
+                return;
+            }
+
+            let html = '';
+            filtered.forEach(line => {
+                let cls = 'info';
+                if (line.includes('WARNING')) cls = 'warning';
+                if (line.includes('ERROR')) cls = 'error';
+                const escaped = line.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n$/, '');
+                html += '<div class="log-line ' + cls + '">' + escaped + '</div>';
+            });
+            container.innerHTML = html;
+            container.scrollTop = container.scrollHeight;
+            document.getElementById('stats').textContent = '显示 ' + filtered.length + ' / ' + allLogs.length + ' 条';
+        }
+
+        function toggleAuto() {
+            if (autoTimer) {
+                clearInterval(autoTimer);
+                autoTimer = null;
+                document.getElementById('autoBadge').textContent = '关';
+                document.getElementById('autoBadge').className = 'auto-badge off';
+            } else {
+                autoTimer = setInterval(loadLogs, 5000);
+                document.getElementById('autoBadge').textContent = '开';
+                document.getElementById('autoBadge').className = 'auto-badge';
+            }
+        }
+
+        loadLogs();
+    </script>
+</body>
+</html>

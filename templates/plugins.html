@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>插件管理 - RecallDoggy</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,sans-serif;background:#f0f8ff;color:#333;padding:20px;max-width:800px;margin:0 auto}
+h1{color:#4a9ebe;margin-bottom:20px}
+.nav a{color:#4a9ebe;text-decoration:none;margin-right:16px;font-size:14px}
+.box{background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.row{display:flex;gap:10px}
+.row input{flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px}
+.btn{padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-size:13px;color:#fff}
+.bp{background:#A0D8EF}.bd{background:#ff6b6b}.be{background:#51cf66}.bg{background:#adb5bd}
+.card{background:#fff;border-radius:12px;padding:14px 18px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.card-head{display:flex;justify-content:space-between;align-items:center}
+.card h3{font-size:15px}.card h3 span{font-size:12px;color:#999;margin-left:8px;font-weight:normal}
+.card p{font-size:13px;color:#777;margin-top:2px}
+.acts{display:flex;gap:8px}
+.empty{text-align:center;color:#999;padding:40px}
+.hint{font-size:12px;color:#999;margin-top:8px}
+.msg{padding:10px;border-radius:8px;margin-bottom:12px;font-size:13px;display:none}
+.ok{background:#d3f9d8;color:#2b8a3e}.er{background:#ffe3e3;color:#c92a2a}
+.stg{border-top:1px solid #eee;margin-top:12px;padding-top:12px;display:none}
+.sf{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.sf label{font-size:13px;color:#555;min-width:80px}
+.sf input,.sf select{padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;flex:1;max-width:200px}
+.tgl{position:relative;width:44px;height:24px;cursor:pointer;flex:none}
+.tgl input{display:none}
+.tgl .sl{position:absolute;top:0;left:0;right:0;bottom:0;background:#ccc;border-radius:12px;transition:.3s}
+.tgl input:checked+.sl{background:#51cf66}
+.tgl .sl:before{content:'';position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+.tgl input:checked+.sl:before{transform:translateX(20px)}
+</style>
+</head>
+<body>
+<div class="nav"><a href="/">首页</a><a href="/dashboard">仪表盘</a><a href="/plugins">插件</a><a href="/logs">日志</a></div>
+<h1>🧩 插件管理</h1>
+<div id="msg" class="msg"></div>
+<div class="box">
+<h2 style="font-size:16px;margin-bottom:10px;color:#555">安装插件</h2>
+<div class="row">
+<input type="text" id="url" placeholder="GitHub仓库地址">
+<button class="btn bp" onclick="inst()">安装</button>
+</div>
+<p class="hint">⚠️ 安装/卸载/切换后需重启服务生效</p>
+</div>
+<div id="list"></div>
+<script>
+function msg(t,o){var e=document.getElementById('msg');e.textContent=t;e.className='msg '+(o?'ok':'er');e.style.display='block';setTimeout(function(){e.style.display='none'},4000)}
+
+function rField(s,val){
+var v=(val!==undefined)?val:(s.default||'');
+switch(s.type){
+case 'select':return '<select data-key="'+s.key+'">'+(s.options||[]).map(function(o){return '<option value="'+o+'"'+(o===v?' selected':'')+'>'+o+'</option>'}).join('')+'</select>';
+case 'toggle':return '<label class="tgl"><input type="checkbox" data-key="'+s.key+'"'+(v?' checked':'')+'><span class="sl"></span></label>';
+case 'number':return '<input type="number" data-key="'+s.key+'" value="'+v+'">';
+default:return '<input type="text" data-key="'+s.key+'" value="'+v+'">';
+}}
+
+async function load(){
+var r=await fetch('/api/plugins');var d=await r.json();var el=document.getElementById('list');
+if(!d.length){el.innerHTML='<div class="empty">还没有安装任何插件 🐕</div>';return;}
+var html='';
+for(var i=0;i<d.length;i++){
+var p=d[i];
+var hs=p.settings_schema&&p.settings_schema.length>0;
+var h='<div class="card"><div class="card-head"><div><h3>'+p.name+'<span>v'+p.version+'</span></h3><p>'+(p.description||'无描述')+'</p></div><div class="acts">';
+if(hs)h+='<button class="btn bp" onclick="stg(\''+p.name+'\')">⚙️ 设置</button>';
+h+='<button class="btn '+(p.enabled?'be':'bg')+'" onclick="tog(\''+p.name+'\')">'+(p.enabled?'已启用':'已禁用')+'</button>';
+h+='<button class="btn bd" onclick="del(\''+p.name+'\')">卸载</button></div></div>';
+if(hs){
+h+='<div class="stg" id="stg-'+p.name+'">';
+for(var j=0;j<p.settings_schema.length;j++){
+var s=p.settings_schema[j];
+h+='<div class="sf"><label>'+s.label+'</label>'+rField(s)+'</div>';
+}
+h+='<button class="btn bp" style="margin-top:8px" onclick="save(\''+p.name+'\')">💾 保存</button></div>';
+}
+h+='</div>';
+html+=h;
+}
+el.innerHTML=html;
+}
+
+async function stg(name){
+try{
+var panel=document.getElementById('stg-'+name);
+if(!panel){alert('面板不存在: stg-'+name);return;}
+if(panel.style.display==='block'){panel.style.display='none';return;}
+var r=await fetch('/api/plugins/'+name+'/settings');
+if(!r.ok){alert('请求失败: '+r.status);return;}
+var cfg=await r.json();
+var els=panel.querySelectorAll('[data-key]');
+for(var i=0;i<els.length;i++){
+var el=els[i];
+var k=el.dataset.key;
+if(cfg[k]===undefined)continue;
+if(el.type==='checkbox')el.checked=!!cfg[k];
+else el.value=cfg[k];
+}
+panel.style.display='block';
+}catch(e){alert('错误: '+e.message);}
+}
+
+async function save(name){
+try{
+var panel=document.getElementById('stg-'+name);var data={};
+var els=panel.querySelectorAll('[data-key]');
+for(var i=0;i<els.length;i++){
+var el=els[i];
+var k=el.dataset.key;
+if(el.type==='checkbox')data[k]=el.checked;
+else if(el.type==='number')data[k]=Number(el.value);
+else data[k]=el.value;
+}
+var r=await fetch('/api/plugins/'+name+'/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+var d=await r.json();
+if(r.ok&&d.ok)msg('设置已保存',1);else msg(d.detail||'保存失败',0);
+}catch(e){alert('保存错误: '+e.message);}
+}
+
+async function inst(){var u=document.getElementById('url').value.trim();if(!u)return;
+var r=await fetch('/api/plugins/install',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:u})});
+var d=await r.json();if(r.ok&&d.ok){msg('安装成功',1);document.getElementById('url').value='';load();}else msg(d.detail||'失败',0);}
+
+async function tog(n){var r=await fetch('/api/plugins/'+n+'/toggle',{method:'POST'});
+var d=await r.json();if(r.ok&&d.ok){msg(n+(d.enabled?' 已启用':' 已禁用'),1);load();}else msg(d.detail||'失败',0);}
+
+async function del(n){if(!confirm('确定卸载 '+n+'？'))return;
+var r=await fetch('/api/plugins/'+n,{method:'DELETE'});
+var d=await r.json();if(r.ok&&d.ok){msg('已卸载',1);load();}else msg(d.detail||'失败',0);}
+
+load();
+</script>
+</body>
+</html>

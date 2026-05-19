@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+venv/
+.env
+*.db
+*.log
+data/
+plugins/weather/
+.auth
+*.bak
+.auth
+*.bak

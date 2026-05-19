@@ -1,0 +1,245 @@
+# 🐕 RecallDoggy
+
+一个基于 Zilliz Cloud 向量数据库的 MCP 知识库服务，支持 SSE / Streamable HTTP / stdio 三种传输模式。
+
+## ✨ 功能特性
+
+- 📝 **记忆管理** - 写入 / 语义搜索 / 列表 / 编辑 / 删除
+- 🧠 **分层记忆** - flash/short/long/permanent 四级记忆 + 艾宾浩斯衰减
+- 👥 **多用户隔离** - user 字段隔离不同 AI 的记忆（Claude / GPT-4o）
+- 🎉 **纪念日管理** - 添加 / 查询 / 删除纪念日
+- 📅 **时间感知** - mcp_today 工具，支持农历、节气、节日、纪念日查询
+- 🌤️ **天气查询** - mcp_weather 工具
+- 🌐 **三传输模式** - SSE + Streamable HTTP（远程部署）+ stdio（本地直连）
+- 🔐 **双重认证** - 登录认证（bcrypt + session）+ MCP Bearer Token
+- 🛡️ **登录限流** - 滑动窗口限流，防暴力破解
+- 🖥️ **前端页面** - 可视化管理 + Dashboard + 日志查看
+- 🐳 **Docker 支持** - 一键容器化部署
+- 🧩 **插件系统** - 插件化架构，支持 git 安装 / 卸载 / 启用禁用
+
+## 🏗️ 架构
+
+```
+memory.py   — 纯计算（衰减公式、层级升级、格式化）
+store.py    — 数据库抽象层（MemoryStore 基类 + ZillizMemoryStore 实现）
+loader.py   — 插件加载器（扫描/加载/安装/卸载/切换）
+app.py      — 路由 + 中间件 + MCP 工具
+plugins/    — 插件目录（每个插件一个子文件夹 + plugin.json）
+
+```
+
+## 🧠 分层记忆系统
+
+| 层级 | 半衰期 | 升级条件 | 说明 |
+|------|--------|---------|------|
+| 🔴 flash | 24小时 | 默认 | 新写入，没人搜就快速遗忘 |
+| 🟡 short | 7天 | recall ≥ 1 | 被用过，保留一段时间 |
+| 🟢 long | 30天 | recall ≥ 4 | 反复巩固的知识 |
+| 💎 permanent | ∞ | recall ≥ 10 或手动📌 | 核心记忆，永不遗忘 |
+
+- 衰减公式：- 衰减公式：`R = min(1.0, e^(-t/S) × recall_count^0.3)`
+(t=小时数，S=强度系数）
+- 搜索加权：`final_score = similarity × 0.7 + retention × 0.3`
+- permanent 记忆不管搜什么都会返回，不占 top_k 名额
+
+## 🧩 插件系统
+
+支持通过 Git 仓库安装第三方插件，每个插件需包含 `plugin.json` 元数据文件。
+
+### 插件结构
+
+```
+plugins/
+  my-plugin/
+    plugin.json   ← 必须，含 name/version/description/entry
+    main.py       ← 入口文件，需暴露 register(app, mcp_server) 函数
+```
+
+### plugin.json 示例
+
+```json
+{
+  "name": "my-plugin",
+  "version": "0.1.0",
+  "description": "示例插件",
+  "entry": "main.py",
+  "enabled": true
+}
+```
+
+### 管理方式
+
+- 网页：访问 `/plugins` 页面可视化管理
+- API：`GET /api/plugins`、`POST /api/plugins/install`、`DELETE /api/plugins/{name}`、`POST /api/plugins/{name}/toggle`
+- 安装/卸载/切换后需重启服务生效
+```
+
+## 👥 多用户隔离
+
+Zilliz schema 包含 `user` 字段，写入/搜索/统计/导出全部按 user 自动过滤：
+
+```
+user="claude"  → Claude 的记忆
+user="4o"      → GPT-4o 的记忆
+user="default" → 旧数据迁移默认值
+```
+
+启动时自动检测旧 schema（无 user 字段）→ 导出 → 重建 → 回填 user="default"。
+
+## 🚀 快速开始
+
+### 1. 克隆仓库
+
+```bash
+git clone https://github.com/zhanglang2333/RecallDoggy.git
+cd RecallDoggy
+```
+
+### 2. 安装依赖
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. 配置环境变量
+
+创建 `.env` 文件：
+
+```env
+ZILLIZ_URI=你的Zilliz Cloud地址
+ZILLIZ_TOKEN=你的Zilliz Cloud Token
+MCP_TOKEN=你的MCP认证Token（用于远程端点鉴权）
+SESSION_SECRET=你的session密钥（可选，有默认值）
+```
+
+### 4. 启动服务
+
+**SSE 模式（远程部署）：**
+
+```bash
+python app.py
+```
+
+服务启动在 `http://0.0.0.0:8001`
+
+| 端点 | 传输模式 |
+|------|---------|
+| `/mcp/sse` | SSE |
+| `/mcp-http/mcp` | Streamable HTTP |
+
+**stdio 模式（本地直连）：**
+
+```bash
+python app.py --stdio
+```
+
+## 🔐 认证
+
+### 网页登录
+首次访问 `/setup` 设置密码，之后通过 `/login` 登录。滑动窗口限流：600秒内5次失败锁定。
+
+### MCP 远程端点
+SSE / Streamable HTTP 需要在请求头中携带 Bearer Token：
+
+```
+Authorization: Bearer <你的MCP_TOKEN>
+```
+
+stdio 模式不需要认证。
+
+## 🔧 MCP 客户端配置
+
+### Streamable HTTP 模式（推荐）
+
+```json
+{
+  "mcpServers": {
+    "RecallDoggy": {
+      "url": "https://你的域名/mcp-http/mcp",
+      "headers": {
+        "Authorization": "Bearer 你的token"
+      }
+    }
+  }
+}
+```
+
+### SSE 模式
+
+```json
+{
+  "mcpServers": {
+    "RecallDoggy": {
+      "url": "https://你的域名/mcp/sse",
+      "headers": {
+        "Authorization": "Bearer 你的token"
+      }
+    }
+  }
+}
+```
+
+### stdio 模式
+
+**Mac / Linux：**
+
+```json
+{
+  "mcpServers": {
+    "RecallDoggy": {
+      "command": "python3",
+      "args": ["/path/to/RecallDoggy/app.py", "--stdio"],
+      "env": {
+        "ZILLIZ_URI": "你的uri",
+        "ZILLIZ_TOKEN": "你的token"
+      }
+    }
+  }
+}
+```
+
+**Windows：**
+
+```json
+{
+  "mcpServers": {
+    "RecallDoggy": {
+      "command": "python",
+      "args": ["C:\\path\\to\\RecallDoggy\\app.py", "--stdio"],
+      "env": {
+        "ZILLIZ_URI": "你的uri",
+        "ZILLIZ_TOKEN": "你的token"
+      }
+    }
+  }
+}
+```
+
+## 🐳 Docker 部署
+
+```bash
+docker build -t recalldoggy .
+docker run -d -p 8001:8001 --env-file .env recalldoggy
+```
+
+## 🛠️ MCP 工具列表
+
+| 工具 | 功能 | 必填参数 | 可选参数 |
+|------|------|----------|----------|
+| `mcp_write` | 写入记忆 | content | category, tags, memory_level, user |
+| `mcp_search` | 语义搜索（含 permanent 置顶） | query | top_k（默认5）, user |
+| `mcp_delete` | 删除记忆 | doc_id | - |
+| `mcp_stats` | 知识库统计（含各层级数量） | - | user |
+| `mcp_today` | 今日信息（农历/节气/节日/纪念日） | - | - |
+| `mcp_weather` | 天气查询 | - | city（必填！！！）|
+
+## 📋 环境要求
+
+| 依赖 | 版本 |
+|---|---|
+| Python | 3.10+ |
+| 操作系统 | Windows / macOS / Linux |
+
+## 📄 License
+
+MIT
